@@ -1,4 +1,4 @@
-package com.mymate.auto
+package com.mymate.auto.auto
 
 import android.content.Intent
 import androidx.car.app.CarAppService
@@ -18,6 +18,6 @@ class MyMateCarAppService : CarAppService() {
 
 class MyMateSession : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
-        return MainScreen(carContext)
+        return MainAutoScreen(carContext)
     }
 }

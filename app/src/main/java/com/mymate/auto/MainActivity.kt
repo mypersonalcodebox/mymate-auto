@@ -1,52 +1,71 @@
 package com.mymate.auto
 
-import android.app.Activity
 import android.os.Bundle
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.view.Gravity
-import android.graphics.Color
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.mymate.auto.data.local.PreferencesManager
+import com.mymate.auto.ui.chat.ChatScreen
+import com.mymate.auto.ui.settings.SettingsScreen
+import com.mymate.auto.ui.theme.MyMateAutoTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.WHITE)
-            setPadding(64, 128, 64, 64)
+        val preferencesManager = PreferencesManager(this)
+        
+        setContent {
+            val darkMode by preferencesManager.darkMode.collectAsState(
+                initial = runBlocking { preferencesManager.darkMode.first() }
+            )
+            
+            MyMateAutoTheme(darkTheme = darkMode) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MyMateApp()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MyMateApp() {
+    val navController = rememberNavController()
+    
+    NavHost(
+        navController = navController,
+        startDestination = "chat"
+    ) {
+        composable("chat") {
+            ChatScreen(
+                onNavigateToSettings = {
+                    navController.navigate("settings")
+                }
+            )
         }
         
-        val title = TextView(this).apply {
-            text = "MyMate"
-            textSize = 36f
-            setTextColor(Color.parseColor("#2196F3"))
-            gravity = Gravity.CENTER
+        composable("settings") {
+            SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
-        
-        val subtitle = TextView(this).apply {
-            text = "\nAndroid Auto Companion\n\n"
-            textSize = 20f
-            setTextColor(Color.GRAY)
-            gravity = Gravity.CENTER
-        }
-        
-        val instructions = TextView(this).apply {
-            text = "Deze app werkt in Android Auto.\n\n" +
-                   "1. Verbind telefoon met auto\n" +
-                   "2. Open Android Auto\n" +
-                   "3. Zoek MyMate in de apps\n\n" +
-                   "Webhook: 100.124.24.27:18791"
-            textSize = 16f
-            setTextColor(Color.DKGRAY)
-            gravity = Gravity.CENTER
-        }
-        
-        layout.addView(title)
-        layout.addView(subtitle)
-        layout.addView(instructions)
-        
-        setContentView(layout)
     }
 }

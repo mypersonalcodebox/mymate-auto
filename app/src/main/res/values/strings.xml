@@ -1,3 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyMate</string>
+    <string name="app_description">Jouw persoonlijke assistent voor Android Auto</string>
+    
+    <!-- Chat -->
+    <string name="chat_placeholder">Typ een bericht...</string>
+    <string name="chat_send">Verstuur</string>
+    <string name="chat_clear">Wis geschiedenis</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_webhook_url">Webhook URL</string>
+    <string name="settings_tts">Text-to-Speech</string>
+    <string name="settings_notifications">Notificaties</string>
+    <string name="settings_dark_mode">Donkere modus</string>
+    
+    <!-- Connection -->
+    <string name="connection_connected">Verbonden</string>
+    <string name="connection_connecting">Verbinden...</string>
+    <string name="connection_disconnected">Niet verbonden</string>
+    <string name="connection_error">Verbindingsfout</string>
+    
+    <!-- Quick Actions -->
+    <string name="action_agenda">Agenda vandaag</string>
+    <string name="action_mail">Ongelezen mail</string>
+    <string name="action_weather">Weer</string>
+    <string name="action_home">Onderweg naar huis</string>
+    <string name="action_remind">Herinner me</string>
+    <string name="action_shopping">Boodschappenlijst</string>
+    <string name="action_news">Nieuws briefing</string>
+    <string name="action_expenses">Uitgaven vandaag</string>
+    <string name="action_traffic">Verkeer</string>
+    <string name="action_call">Bel contact</string>
+    <string name="action_message">Stuur bericht</string>
+    <string name="action_appointment">Volgende afspraak</string>
+    <string name="action_music">Speel muziek</string>
+    <string name="action_location">Waar ben ik</string>
 </resources>
