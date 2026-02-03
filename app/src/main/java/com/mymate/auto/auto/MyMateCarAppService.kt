@@ -14,13 +14,14 @@ import androidx.car.app.validation.HostValidator
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MyMateCarAppService : CarAppService() {
     override fun createHostValidator(): HostValidator {
@@ -34,17 +35,35 @@ class MyMateCarAppService : CarAppService() {
 
 class MyMateSession : Session() {
     private val TAG = "MyMateSession"
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // Use a single-threaded executor for background work
+    private val executor = Executors.newSingleThreadExecutor()
+    private val isDestroyed = AtomicBoolean(false)
     
     override fun onCreateScreen(intent: Intent): Screen {
         Log.d(TAG, "Android Auto session started")
         
-        // Add lifecycle observer to detect session end
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 Log.d(TAG, "Android Auto session ending - sending parking location")
-                sendParkingLocation()
-                scope.cancel()
+                isDestroyed.set(true)
+                
+                // Send parking location in background, but don't block
+                executor.submit {
+                    try {
+                        sendParkingLocation()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending parking location", e)
+                    }
+                }
+                
+                // Shutdown executor after a delay to allow parking notification to complete
+                executor.shutdown()
+                try {
+                    executor.awaitTermination(5, TimeUnit.SECONDS)
+                } catch (e: InterruptedException) {
+                    Log.w(TAG, "Executor shutdown interrupted")
+                }
             }
         })
         
@@ -52,50 +71,74 @@ class MyMateSession : Session() {
     }
     
     private fun sendParkingLocation() {
-        scope.launch {
-            try {
-                val location = getLastKnownLocation()
-                if (location != null) {
-                    sendLocationToWebhook(location)
-                    Log.d(TAG, "Parking location sent: ${location.latitude}, ${location.longitude}")
-                } else {
-                    Log.w(TAG, "Could not get location for parking")
-                    sendParkingNotification(null)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending parking location", e)
+        if (isDestroyed.get()) {
+            Log.d(TAG, "Session destroyed, attempting to send parking location anyway")
+        }
+        
+        try {
+            val location = getLastKnownLocation()
+            sendParkingNotification(location)
+            
+            if (location != null) {
+                Log.d(TAG, "Parking location sent: ${location.latitude}, ${location.longitude}")
+            } else {
+                Log.w(TAG, "Parking notification sent without location")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in sendParkingLocation", e)
         }
     }
     
     private fun getLastKnownLocation(): Location? {
         val context = carContext
         
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
-            != PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED) {
+        // Check permissions
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context, 
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        if (!hasFineLocation && !hasCoarseLocation) {
             Log.w(TAG, "Location permission not granted")
             return null
         }
         
-        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        
-        var location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-        if (location == null) {
-            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        return try {
+            val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            
+            // Try GPS first, then network
+            var location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (location == null) {
+                location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            }
+            
+            // Check if location is recent (within last 10 minutes)
+            if (location != null) {
+                val age = System.currentTimeMillis() - location.time
+                if (age > 10 * 60 * 1000) {
+                    Log.w(TAG, "Location is stale: ${age / 1000}s old")
+                }
+            }
+            
+            location
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception getting location", e)
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting location", e)
+            null
         }
-        
-        return location
     }
     
-    private suspend fun sendLocationToWebhook(location: Location) {
-        sendParkingNotification(location)
-    }
-    
-    private suspend fun sendParkingNotification(location: Location?) {
+    private fun sendParkingNotification(location: Location?) {
         val prefs = carContext.getSharedPreferences("mymate_prefs", Context.MODE_PRIVATE)
-        val webhookUrl = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") ?: return
+        val webhookUrl = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") 
+            ?: return
         
         val client = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -106,6 +149,7 @@ class MyMateSession : Session() {
         val json = JSONObject().apply {
             put("action", "parking")
             put("message", "Auto geparkeerd")
+            put("source", "android_auto")
             if (location != null) {
                 put("latitude", location.latitude)
                 put("longitude", location.longitude)

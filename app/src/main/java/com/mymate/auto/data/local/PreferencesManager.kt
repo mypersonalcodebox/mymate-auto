@@ -42,7 +42,8 @@ class PreferencesManager(private val context: Context) {
     }
     
     val webSocketEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[WEBSOCKET_ENABLED] ?: true
+        // WebSocket is DISABLED by default - the webhook doesn't have a WS endpoint
+        prefs[WEBSOCKET_ENABLED] ?: false
     }
     
     val darkMode: Flow<Boolean> = context.dataStore.data.map { prefs ->
