@@ -12,6 +12,8 @@ import androidx.car.app.Screen
 import androidx.car.app.Session
 import androidx.car.app.validation.HostValidator
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -36,17 +38,17 @@ class MyMateSession : Session() {
     
     override fun onCreateScreen(intent: Intent): Screen {
         Log.d(TAG, "Android Auto session started")
+        
+        // Add lifecycle observer to detect session end
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                Log.d(TAG, "Android Auto session ending - sending parking location")
+                sendParkingLocation()
+                scope.cancel()
+            }
+        })
+        
         return MainAutoScreen(carContext)
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        Log.d(TAG, "Android Auto session ending - sending parking location")
-        
-        // Get location and send it
-        sendParkingLocation()
-        
-        scope.cancel()
     }
     
     private fun sendParkingLocation() {
@@ -58,7 +60,6 @@ class MyMateSession : Session() {
                     Log.d(TAG, "Parking location sent: ${location.latitude}, ${location.longitude}")
                 } else {
                     Log.w(TAG, "Could not get location for parking")
-                    // Still notify that car was parked, just without location
                     sendParkingNotification(null)
                 }
             } catch (e: Exception) {
@@ -70,7 +71,6 @@ class MyMateSession : Session() {
     private fun getLastKnownLocation(): Location? {
         val context = carContext
         
-        // Check permission
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
             != PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -81,7 +81,6 @@ class MyMateSession : Session() {
         
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         
-        // Try GPS first, then network
         var location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
         if (location == null) {
             location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
