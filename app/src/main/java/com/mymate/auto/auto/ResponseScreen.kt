@@ -4,6 +4,8 @@ import android.speech.tts.TextToSpeech
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import java.util.*
 
 class ResponseScreen(
@@ -20,6 +22,15 @@ class ResponseScreen(
     
     init {
         tts = TextToSpeech(carContext, this)
+        
+        // Clean up TTS when screen is destroyed
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                tts?.stop()
+                tts?.shutdown()
+                tts = null
+            }
+        })
     }
     
     override fun onInit(status: Int) {
@@ -60,11 +71,5 @@ class ResponseScreen(
             .setTitle("MyMate")
             .setHeaderAction(Action.BACK)
             .build()
-    }
-    
-    override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
-        super.onDestroy(owner)
-        tts?.stop()
-        tts?.shutdown()
     }
 }
