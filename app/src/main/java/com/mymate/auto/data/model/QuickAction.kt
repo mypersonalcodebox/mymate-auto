@@ -11,6 +11,7 @@ data class QuickAction(
 )
 
 enum class ActionCategory {
+    DEV,
     CALENDAR,
     COMMUNICATION,
     INFO,
@@ -20,32 +21,130 @@ enum class ActionCategory {
 
 object QuickActions {
     val defaultActions = listOf(
-        // Agenda & Planning
-        QuickAction("agenda_today", "📅", "Wat staat er vandaag?", "Wat staat er vandaag op mijn agenda?", ActionCategory.CALENDAR),
-        QuickAction("next_appointment", "⏰", "Volgende afspraak", "Wat is mijn volgende afspraak en wanneer moet ik weg?", ActionCategory.CALENDAR),
-        QuickAction("week_overview", "📋", "Deze week", "Geef me een overzicht van wat er deze week gepland staat", ActionCategory.CALENDAR),
+        // === DEVELOPER ACTIES (prioriteit voor Ferron) ===
         
-        // Communicatie
-        QuickAction("important_mail", "📧", "Belangrijke mail?", "Heb ik belangrijke of urgente emails die ik moet weten?", ActionCategory.COMMUNICATION),
-        QuickAction("unread_messages", "💬", "Gemiste berichten", "Heb ik belangrijke berichten gemist?", ActionCategory.COMMUNICATION),
+        // Taken & Project Management
+        QuickAction(
+            "start_task", "🛠️", "Start een taak", "",
+            ActionCategory.DEV
+        ),
+        QuickAction(
+            "task_status", "🔄", "Status lopende taken",
+            "Wat zijn de status updates van mijn lopende taken? Zijn er subagents actief? Wat loopt er?",
+            ActionCategory.DEV
+        ),
+        QuickAction(
+            "github_issue", "📋", "GitHub issue maken", "",
+            ActionCategory.DEV
+        ),
+        QuickAction(
+            "build_feature", "🚀", "Bouw feature",
+            "Ik wil een nieuwe feature bouwen. ",
+            ActionCategory.DEV
+        ),
+        QuickAction(
+            "code_review", "👀", "Review code",
+            "Zijn er pull requests of code changes die ik moet reviewen?",
+            ActionCategory.DEV
+        ),
+        QuickAction(
+            "deploy_status", "📦", "Deploy status",
+            "Wat is de status van recente deploys en builds?",
+            ActionCategory.DEV
+        ),
         
-        // Informatie & Zoeken
-        QuickAction("search_info", "🔍", "Zoek informatie", "Zoek informatie over ", ActionCategory.INFO),
-        QuickAction("tell_story", "📖", "Vertel een verhaal", "Vertel me een interessant verhaal of feitje", ActionCategory.INFO),
-        QuickAction("news_briefing", "📰", "Nieuws", "Wat is het belangrijkste nieuws vandaag?", ActionCategory.INFO),
-        QuickAction("weather", "☀️", "Weer", "Wat is het weer vandaag en moet ik rekening houden met iets?", ActionCategory.INFO),
+        // === AGENDA & PLANNING ===
+        QuickAction(
+            "agenda_today", "📅", "Agenda vandaag",
+            "Wat staat er vandaag op mijn agenda? Geef een kort overzicht.",
+            ActionCategory.CALENDAR
+        ),
+        QuickAction(
+            "next_appointment", "⏰", "Volgende afspraak",
+            "Wat is mijn volgende afspraak en wanneer moet ik weg?",
+            ActionCategory.CALENDAR
+        ),
+        QuickAction(
+            "week_planning", "📋", "Weekplanning",
+            "Geef me een overzicht van wat er deze week gepland staat, inclusief deadlines.",
+            ActionCategory.CALENDAR
+        ),
         
-        // Navigatie & Locatie  
-        QuickAction("going_home", "🏠", "Naar huis", "Ik ga naar huis, zijn er files of moet ik iets weten?", ActionCategory.NAVIGATION),
-        QuickAction("route_to", "🗺️", "Route naar...", "Zoek de beste route naar ", ActionCategory.NAVIGATION),
-        QuickAction("traffic_info", "🚗", "Verkeer check", "Hoe is het verkeer op mijn route?", ActionCategory.NAVIGATION),
-        QuickAction("nearby", "📍", "Wat is hier?", "Wat is er interessant in de buurt?", ActionCategory.NAVIGATION),
+        // === COMMUNICATIE ===
+        QuickAction(
+            "mail_check", "📧", "Check mail",
+            "Heb ik belangrijke of urgente emails? Geef me een korte samenvatting van de belangrijkste.",
+            ActionCategory.COMMUNICATION
+        ),
+        QuickAction(
+            "unread_messages", "💬", "Gemiste berichten",
+            "Heb ik belangrijke berichten gemist op Telegram of andere kanalen?",
+            ActionCategory.COMMUNICATION
+        ),
+        QuickAction(
+            "send_update", "📣", "Stuur update", "",
+            ActionCategory.COMMUNICATION
+        ),
         
-        // Herinneringen
-        QuickAction("remind_later", "⏰", "Herinner me straks", "Herinner me over 30 minuten aan ", ActionCategory.GENERAL),
-        QuickAction("remind_home", "🏡", "Herinner thuis", "Herinner me als ik thuis ben om ", ActionCategory.GENERAL),
+        // === INFORMATIE & ZOEKEN ===
+        QuickAction(
+            "search_info", "🔍", "Zoek informatie", "",
+            ActionCategory.INFO
+        ),
+        QuickAction(
+            "tell_story", "📖", "Verhaal/feitje",
+            "Vertel me een interessant verhaal of leuk feitje. Iets om de rit te veraangenamen.",
+            ActionCategory.INFO
+        ),
+        QuickAction(
+            "news_tech", "📰", "Tech nieuws",
+            "Wat is het belangrijkste tech nieuws vandaag? Focus op AI, development en startups.",
+            ActionCategory.INFO
+        ),
+        QuickAction(
+            "weather", "☀️", "Weer",
+            "Wat is het weer vandaag en de komende uren? Moet ik ergens rekening mee houden?",
+            ActionCategory.INFO
+        ),
+        QuickAction(
+            "explain", "🧠", "Leg uit", "",
+            ActionCategory.INFO
+        ),
         
-        // Vrije vraag (altijd onderaan)
-        QuickAction("free_chat", "💭", "Stel een vraag", "", ActionCategory.GENERAL)
+        // === NAVIGATIE & LOCATIE ===
+        QuickAction(
+            "going_home", "🏠", "Naar huis",
+            "Ik ga naar huis. Zijn er files of vertragingen op de route? Moet ik iets weten?",
+            ActionCategory.NAVIGATION
+        ),
+        QuickAction(
+            "traffic_check", "🚗", "Verkeer check",
+            "Hoe is het verkeer? Zijn er files of ongelukken die ik moet vermijden?",
+            ActionCategory.NAVIGATION
+        ),
+        QuickAction(
+            "find_place", "📍", "Zoek locatie", "",
+            ActionCategory.NAVIGATION
+        ),
+        
+        // === HERINNERINGEN & NOTITIES ===
+        QuickAction(
+            "quick_note", "📝", "Snelle notitie", "",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "remind_me", "⏰", "Herinner me", "",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "idea", "💡", "Idee vastleggen", "",
+            ActionCategory.GENERAL
+        ),
+        
+        // === VRIJE VRAAG (altijd onderaan) ===
+        QuickAction(
+            "free_chat", "💬", "Vrije vraag", "",
+            ActionCategory.GENERAL
+        )
     )
 }
