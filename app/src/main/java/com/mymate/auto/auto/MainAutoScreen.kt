@@ -1,6 +1,9 @@
 package com.mymate.auto.auto
 
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
@@ -18,6 +21,9 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
+    
+    private val TAG = "MainAutoScreen"
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -40,7 +46,6 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     init {
         tts = TextToSpeech(carContext, this)
         
-        // Clean up TTS when screen is destroyed
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 tts?.stop()
@@ -62,7 +67,6 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
         
         val listBuilder = ItemList.Builder()
         
-        // Add sorted quick actions
         sortedActions.take(15).forEach { action ->
             listBuilder.addItem(
                 Row.Builder()
@@ -73,7 +77,6 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                             incrementUsage(action.id)
                             sendMessage(action.query, action.id)
                         } else {
-                            // Free chat - open voice input
                             screenManager.push(VoiceInputScreen(carContext) { message ->
                                 sendMessage(message, action.id)
                             })
@@ -83,7 +86,6 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
             )
         }
         
-        // Add voice input option
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🎤 Spreek vrij")
@@ -103,7 +105,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 ActionStrip.Builder()
                     .addAction(
                         Action.Builder()
-                            .setTitle("Laatste antwoord")
+                            .setTitle("Laatste")
                             .setOnClickListener {
                                 screenManager.push(ResponseScreen(carContext, currentResponse))
                             }
@@ -179,8 +181,8 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
         
         val json = gson.toJson(mapOf(
             "message" to message,
-            "source" to "android_auto",
-            "quickActionId" to quickActionId
+            "action" to (quickActionId ?: "chat"),
+            "source" to "android_auto"
         ))
         val body = json.toRequestBody("application/json".toMediaType())
         
@@ -188,39 +190,57 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
             .url(webhookUrl)
             .post(body)
             .addHeader("Content-Type", "application/json")
-            .addHeader("X-Source", "MyMate-Android-Auto")
             .build()
+        
+        Log.d(TAG, "Sending message: $message")
         
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                currentResponse = "❌ Verbindingsfout: ${e.localizedMessage}"
-                isLoading = false
-                invalidate()
+                Log.e(TAG, "Request failed", e)
+                
+                // Run on main thread!
+                mainHandler.post {
+                    currentResponse = "❌ Verbindingsfout: ${e.localizedMessage}"
+                    isLoading = false
+                    invalidate()
+                }
             }
             
             override fun onResponse(call: Call, response: Response) {
-                isLoading = false
+                Log.d(TAG, "Got response: ${response.code}")
                 
-                response.body?.string()?.let { responseBody ->
-                    try {
+                val responseText = try {
+                    response.body?.string()?.let { responseBody ->
                         val result = gson.fromJson(responseBody, Map::class.java)
-                        currentResponse = result["reply"]?.toString() ?: "Geen antwoord ontvangen"
-                    } catch (e: Exception) {
-                        currentResponse = responseBody
-                    }
+                        result["reply"]?.toString() 
+                            ?: result["message"]?.toString() 
+                            ?: "Geen antwoord"
+                    } ?: "Leeg antwoord"
+                } catch (e: Exception) {
+                    Log.e(TAG, "Parse error", e)
+                    "Fout bij verwerken antwoord"
+                }
+                
+                // Run everything on main thread!
+                mainHandler.post {
+                    currentResponse = responseText
+                    isLoading = false
                     
                     // Speak response if TTS is enabled
                     if (ttsEnabled && ttsReady) {
                         tts?.speak(currentResponse, TextToSpeech.QUEUE_FLUSH, null, "response")
                     }
                     
-                    // Show response screen
-                    screenManager.push(ResponseScreen(carContext, currentResponse))
-                } ?: run {
-                    currentResponse = "Leeg antwoord ontvangen"
+                    // Update UI first
+                    invalidate()
+                    
+                    // Then push response screen
+                    try {
+                        screenManager.push(ResponseScreen(carContext, currentResponse))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to push response screen", e)
+                    }
                 }
-                
-                invalidate()
             }
         })
     }
