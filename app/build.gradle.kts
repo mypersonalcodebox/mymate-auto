@@ -12,21 +12,29 @@ android {
         applicationId = "com.mymate.auto"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "2.0"
+        versionCode = 5
+        versionName = "2.1"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Use default debug keystore
+        }
+    }
+    
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug") // Sign release with debug key for testing
         }
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     
