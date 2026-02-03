@@ -11,7 +11,6 @@ data class QuickAction(
 )
 
 enum class ActionCategory {
-    DEV,
     CALENDAR,
     COMMUNICATION,
     INFO,
@@ -20,40 +19,10 @@ enum class ActionCategory {
 }
 
 object QuickActions {
-    val defaultActions = listOf(
-        // === DEVELOPER ACTIES (prioriteit voor Ferron) ===
-        
-        // Taken & Project Management
-        QuickAction(
-            "start_task", "🛠️", "Start een taak", "",
-            ActionCategory.DEV
-        ),
-        QuickAction(
-            "task_status", "🔄", "Status lopende taken",
-            "Wat zijn de status updates van mijn lopende taken? Zijn er subagents actief? Wat loopt er?",
-            ActionCategory.DEV
-        ),
-        QuickAction(
-            "github_issue", "📋", "GitHub issue maken", "",
-            ActionCategory.DEV
-        ),
-        QuickAction(
-            "build_feature", "🚀", "Bouw feature",
-            "Ik wil een nieuwe feature bouwen. ",
-            ActionCategory.DEV
-        ),
-        QuickAction(
-            "code_review", "👀", "Review code",
-            "Zijn er pull requests of code changes die ik moet reviewen?",
-            ActionCategory.DEV
-        ),
-        QuickAction(
-            "deploy_status", "📦", "Deploy status",
-            "Wat is de status van recente deploys en builds?",
-            ActionCategory.DEV
-        ),
-        
-        // === AGENDA & PLANNING ===
+    
+    // === HOOFDMENU ACTIES (geen developer stuff hier) ===
+    val mainActions = listOf(
+        // Agenda & Planning
         QuickAction(
             "agenda_today", "📅", "Agenda vandaag",
             "Wat staat er vandaag op mijn agenda? Geef een kort overzicht.",
@@ -70,7 +39,7 @@ object QuickActions {
             ActionCategory.CALENDAR
         ),
         
-        // === COMMUNICATIE ===
+        // Communicatie
         QuickAction(
             "mail_check", "📧", "Check mail",
             "Heb ik belangrijke of urgente emails? Geef me een korte samenvatting van de belangrijkste.",
@@ -81,12 +50,8 @@ object QuickActions {
             "Heb ik belangrijke berichten gemist op Telegram of andere kanalen?",
             ActionCategory.COMMUNICATION
         ),
-        QuickAction(
-            "send_update", "📣", "Stuur update", "",
-            ActionCategory.COMMUNICATION
-        ),
         
-        // === INFORMATIE & ZOEKEN ===
+        // Informatie & Zoeken
         QuickAction(
             "search_info", "🔍", "Zoek informatie", "",
             ActionCategory.INFO
@@ -97,8 +62,8 @@ object QuickActions {
             ActionCategory.INFO
         ),
         QuickAction(
-            "news_tech", "📰", "Tech nieuws",
-            "Wat is het belangrijkste tech nieuws vandaag? Focus op AI, development en startups.",
+            "news_tech", "📰", "Nieuws",
+            "Wat is het belangrijkste nieuws vandaag?",
             ActionCategory.INFO
         ),
         QuickAction(
@@ -106,12 +71,8 @@ object QuickActions {
             "Wat is het weer vandaag en de komende uren? Moet ik ergens rekening mee houden?",
             ActionCategory.INFO
         ),
-        QuickAction(
-            "explain", "🧠", "Leg uit", "",
-            ActionCategory.INFO
-        ),
         
-        // === NAVIGATIE & LOCATIE ===
+        // Navigatie & Locatie
         QuickAction(
             "going_home", "🏠", "Naar huis",
             "Ik ga naar huis. Zijn er files of vertragingen op de route? Moet ik iets weten?",
@@ -122,12 +83,8 @@ object QuickActions {
             "Hoe is het verkeer? Zijn er files of ongelukken die ik moet vermijden?",
             ActionCategory.NAVIGATION
         ),
-        QuickAction(
-            "find_place", "📍", "Zoek locatie", "",
-            ActionCategory.NAVIGATION
-        ),
         
-        // === HERINNERINGEN & NOTITIES ===
+        // Herinneringen & Notities
         QuickAction(
             "quick_note", "📝", "Snelle notitie", "",
             ActionCategory.GENERAL
@@ -136,15 +93,54 @@ object QuickActions {
             "remind_me", "⏰", "Herinner me", "",
             ActionCategory.GENERAL
         ),
-        QuickAction(
-            "idea", "💡", "Idee vastleggen", "",
-            ActionCategory.GENERAL
-        ),
         
-        // === VRIJE VRAAG (altijd onderaan) ===
+        // Vrije vraag
         QuickAction(
             "free_chat", "💬", "Vrije vraag", "",
             ActionCategory.GENERAL
         )
     )
+    
+    // === DEVELOPER ACTIES (apart submenu) ===
+    val developerActions = listOf(
+        QuickAction(
+            "start_task", "🛠️", "Start een taak", "",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "github_issue", "📋", "GitHub issue maken", "",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "build_feature", "🚀", "Bouw feature in repo",
+            "Ik wil een nieuwe feature bouwen. ",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "task_status", "🔄", "Status lopende taken",
+            "Wat zijn de status updates van mijn lopende taken? Zijn er subagents actief? Wat loopt er?",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "project_update", "📣", "Update over project", "",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "code_review", "👀", "Review code",
+            "Zijn er pull requests of code changes die ik moet reviewen?",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "deploy_status", "📦", "Deploy status",
+            "Wat is de status van recente deploys en builds?",
+            ActionCategory.GENERAL
+        ),
+        QuickAction(
+            "dev_idea", "💡", "Dev idee vastleggen", "",
+            ActionCategory.GENERAL
+        )
+    )
+    
+    // Legacy: alle acties samen (voor backwards compatibility)
+    val defaultActions = mainActions + developerActions
 }

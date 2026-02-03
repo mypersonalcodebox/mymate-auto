@@ -20,9 +20,9 @@ import java.io.IOException
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
+class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
     
-    private val TAG = "MainAutoScreen"
+    private val TAG = "DeveloperActionsScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
     
     private val client = OkHttpClient.Builder()
@@ -40,7 +40,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     private val ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
     
-    private var currentResponse: String = "Welkom bij MyMate! Kies een actie of stel een vraag."
+    private var currentResponse: String = ""
     private var isLoading = false
     
     init {
@@ -63,12 +63,11 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     }
     
     override fun onGetTemplate(): Template {
-        val sortedActions = getSortedQuickActions()
+        val sortedActions = getSortedDeveloperActions()
         
         val listBuilder = ItemList.Builder()
         
-        // Normale quick actions (max 12 om ruimte te laten voor Developer + Spreek vrij)
-        sortedActions.take(12).forEach { action ->
+        sortedActions.forEach { action ->
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle("${action.emoji} ${action.title}")
@@ -79,6 +78,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                             sendMessage(action.query, action.id)
                         } else {
                             screenManager.push(VoiceInputScreen(carContext) { message ->
+                                incrementUsage(action.id)
                                 sendMessage(message, action.id)
                             })
                         }
@@ -87,50 +87,15 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
             )
         }
         
-        // === DEVELOPER SUBMENU ===
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🛠️ Developer")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(DeveloperActionsScreen(carContext))
-                }
-                .build()
-        )
-        
-        // === VRIJE VRAAG ===
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🎤 Spreek vrij")
-                .setOnClickListener {
-                    screenManager.push(VoiceInputScreen(carContext) { message ->
-                        sendMessage(message, null)
-                    })
-                }
-                .build()
-        )
-        
         return ListTemplate.Builder()
-            .setTitle("MyMate")
-            .setHeaderAction(Action.APP_ICON)
+            .setTitle("🛠️ Developer")
+            .setHeaderAction(Action.BACK)
             .setSingleList(listBuilder.build())
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(
-                        Action.Builder()
-                            .setTitle("Laatste")
-                            .setOnClickListener {
-                                screenManager.push(ResponseScreen(carContext, currentResponse))
-                            }
-                            .build()
-                    )
-                    .build()
-            )
             .setLoading(isLoading)
             .build()
     }
     
-    private fun getSortedQuickActions(): List<QuickAction> {
+    private fun getSortedDeveloperActions(): List<QuickAction> {
         val usageJson = prefs.getString("action_usage", "{}") ?: "{}"
         val lastUsedJson = prefs.getString("action_last_used", "{}") ?: "{}"
         
@@ -149,8 +114,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
             emptyMap()
         }
         
-        // Alleen mainActions, NIET developerActions
-        return QuickActions.mainActions.map { action ->
+        return QuickActions.developerActions.map { action ->
             action.copy(
                 usageCount = usageMap[action.id] ?: 0,
                 lastUsed = lastUsedMap[action.id] ?: 0
@@ -195,8 +159,9 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
         
         val json = gson.toJson(mapOf(
             "message" to message,
-            "action" to (quickActionId ?: "chat"),
-            "source" to "android_auto"
+            "action" to (quickActionId ?: "dev_chat"),
+            "source" to "android_auto",
+            "category" to "developer"
         ))
         val body = json.toRequestBody("application/json".toMediaType())
         
@@ -206,13 +171,12 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
             .addHeader("Content-Type", "application/json")
             .build()
         
-        Log.d(TAG, "Sending message: $message")
+        Log.d(TAG, "Sending dev message: $message")
         
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Request failed", e)
                 
-                // Run on main thread!
                 mainHandler.post {
                     currentResponse = "❌ Verbindingsfout: ${e.localizedMessage}"
                     isLoading = false
@@ -235,20 +199,16 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                     "Fout bij verwerken antwoord"
                 }
                 
-                // Run everything on main thread!
                 mainHandler.post {
                     currentResponse = responseText
                     isLoading = false
                     
-                    // Speak response if TTS is enabled
                     if (ttsEnabled && ttsReady) {
                         tts?.speak(currentResponse, TextToSpeech.QUEUE_FLUSH, null, "response")
                     }
                     
-                    // Update UI first
                     invalidate()
                     
-                    // Then push response screen
                     try {
                         screenManager.push(ResponseScreen(carContext, currentResponse))
                     } catch (e: Exception) {
