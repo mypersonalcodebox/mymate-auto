@@ -3,6 +3,7 @@ package com.mymate.auto.util
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import com.mymate.auto.R
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -122,17 +123,6 @@ object NetworkUtils {
             is NetworkError.HttpError -> error.code >= 500  // Server errors are retryable
             is NetworkError.Unknown -> true
         }
-    }
-}
-
-// Import for R class - must be added
-private object R {
-    object string {
-        const val error_no_internet = com.mymate.auto.R.string.error_no_internet
-        const val error_auth_failed = com.mymate.auto.R.string.error_auth_failed
-        const val error_gateway_unreachable = com.mymate.auto.R.string.error_gateway_unreachable
-        const val error_timeout = com.mymate.auto.R.string.error_timeout
-        const val error_unknown = com.mymate.auto.R.string.error_unknown
     }
 }
 

@@ -538,3 +538,137 @@ fun SettingsSwitch(
         }
     }
 }
+
+@Composable
+fun ConnectionStatusCard(
+    webSocketState: WebSocketConnectionState,
+    modifier: Modifier = Modifier
+) {
+    val (statusColor, statusText, statusIcon) = when (webSocketState) {
+        WebSocketConnectionState.Connected -> Triple(Color(0xFF4CAF50), "Verbonden", Icons.Default.CheckCircle)
+        WebSocketConnectionState.Connecting -> Triple(Color(0xFFFF9800), "Verbinden...", Icons.Default.Sync)
+        WebSocketConnectionState.Reconnecting -> Triple(Color(0xFFFF9800), "Herverbinden...", Icons.Default.Sync)
+        WebSocketConnectionState.Disconnected -> Triple(Color(0xFF9E9E9E), "Niet verbonden", Icons.Default.CloudOff)
+        WebSocketConnectionState.Error -> Triple(Color(0xFFF44336), "Verbindingsfout", Icons.Default.Error)
+        WebSocketConnectionState.Unknown -> Triple(Color(0xFF9E9E9E), "Onbekend", Icons.Default.HelpOutline)
+    }
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = statusColor.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                statusIcon,
+                contentDescription = statusText,
+                tint = statusColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Gateway Status",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = statusColor
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ConnectionTestDialog(
+    state: ConnectionTestState,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Verbindingstest") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                when (state) {
+                    is ConnectionTestState.Idle -> {
+                        Text("Druk op Test om de verbinding te controleren")
+                    }
+                    is ConnectionTestState.Testing -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = PrimaryBlue
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(state.message)
+                    }
+                    is ConnectionTestState.Success -> {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Succes",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = state.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = state.details,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    is ConnectionTestState.Failed -> {
+                        Icon(
+                            Icons.Default.Error,
+                            contentDescription = "Fout",
+                            tint = Color(0xFFF44336),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = state.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = state.details,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (state is ConnectionTestState.Failed) {
+                TextButton(onClick = onRetry) {
+                    Text("Opnieuw")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Sluiten")
+            }
+        }
+    )
+}
