@@ -26,7 +26,15 @@ class PreferencesManager(private val context: Context) {
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val AUTO_RECONNECT = booleanPreferencesKey("auto_reconnect")
         
-        const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18791/auto"
+        // OpenClaw Gateway settings
+        val GATEWAY_URL = stringPreferencesKey("gateway_url")
+        val GATEWAY_TOKEN = stringPreferencesKey("gateway_token")
+        val USE_OPENCLAW_WEBSOCKET = booleanPreferencesKey("use_openclaw_websocket")
+        val SESSION_KEY = stringPreferencesKey("session_key")
+        
+        const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
+        const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
+        const val DEFAULT_SESSION_KEY = "agent:main:mymate"
     }
     
     val webhookUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -52,6 +60,24 @@ class PreferencesManager(private val context: Context) {
     
     val autoReconnect: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[AUTO_RECONNECT] ?: true
+    }
+    
+    // OpenClaw Gateway settings
+    val gatewayUrl: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[GATEWAY_URL] ?: DEFAULT_GATEWAY_URL
+    }
+    
+    val gatewayToken: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[GATEWAY_TOKEN]
+    }
+    
+    val useOpenClawWebSocket: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        // OpenClaw WebSocket is ENABLED by default for real-time communication
+        prefs[USE_OPENCLAW_WEBSOCKET] ?: true
+    }
+    
+    val sessionKey: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[SESSION_KEY] ?: DEFAULT_SESSION_KEY
     }
     
     suspend fun setWebhookUrl(url: String) {
@@ -82,6 +108,51 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[DARK_MODE] = enabled
         }
+    }
+    
+    // OpenClaw Gateway settings
+    suspend fun setGatewayUrl(url: String) {
+        context.dataStore.edit { prefs ->
+            prefs[GATEWAY_URL] = url
+        }
+    }
+    
+    suspend fun setGatewayToken(token: String?) {
+        context.dataStore.edit { prefs ->
+            if (token != null) {
+                prefs[GATEWAY_TOKEN] = token
+            } else {
+                prefs.remove(GATEWAY_TOKEN)
+            }
+        }
+    }
+    
+    suspend fun setUseOpenClawWebSocket(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[USE_OPENCLAW_WEBSOCKET] = enabled
+        }
+    }
+    
+    suspend fun setSessionKey(key: String) {
+        context.dataStore.edit { prefs ->
+            prefs[SESSION_KEY] = key
+        }
+    }
+    
+    suspend fun getGatewayUrlSync(): String {
+        return context.dataStore.data.first()[GATEWAY_URL] ?: DEFAULT_GATEWAY_URL
+    }
+    
+    suspend fun getGatewayTokenSync(): String? {
+        return context.dataStore.data.first()[GATEWAY_TOKEN]
+    }
+    
+    suspend fun getSessionKeySync(): String {
+        return context.dataStore.data.first()[SESSION_KEY] ?: DEFAULT_SESSION_KEY
+    }
+    
+    suspend fun getUseOpenClawWebSocketSync(): Boolean {
+        return context.dataStore.data.first()[USE_OPENCLAW_WEBSOCKET] ?: true
     }
     
     // Action usage tracking

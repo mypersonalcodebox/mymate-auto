@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -29,6 +30,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.remote.WebSocketManager
@@ -48,9 +58,57 @@ fun ChatScreen(
     val connectionState by viewModel.connectionState.collectAsState()
     
     var inputText by remember { mutableStateOf("") }
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    
+    // Voice input state
+    var pendingAction by remember { mutableStateOf<QuickAction?>(null) }
+    var showInputDialog by remember { mutableStateOf(false) }
+    var dialogInputText by remember { mutableStateOf("") }
+    
+    // Voice recognition launcher
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!spokenText.isNullOrBlank()) {
+            if (pendingAction != null) {
+                // Complete the pending action with voice input
+                val action = pendingAction!!
+                val fullQuery = if (action.query.isNotEmpty()) {
+                    "${action.query} $spokenText"
+                } else {
+                    spokenText
+                }
+                viewModel.sendMessage(fullQuery)
+                pendingAction = null
+            } else {
+                // Direct voice input
+                viewModel.sendMessage(spokenText)
+            }
+        }
+    }
+    
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startVoiceRecognition(context, speechLauncher)
+        } else {
+            Toast.makeText(context, "Microfoon permissie nodig voor spraak", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    fun launchVoiceInput() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startVoiceRecognition(context, speechLauncher)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
     
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
@@ -93,13 +151,82 @@ fun ChatScreen(
                 actions = uiState.quickActions,
                 onActionClick = { action ->
                     if (action.query.isEmpty()) {
-                        // Free chat - just focus input
+                        // Action needs user input - show dialog
+                        pendingAction = action
+                        dialogInputText = ""
+                        showInputDialog = true
                     } else {
                         viewModel.executeQuickAction(action)
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             )
+            
+            // Input dialog for actions that need user input
+            if (showInputDialog && pendingAction != null) {
+                AlertDialog(
+                    onDismissRequest = { 
+                        showInputDialog = false
+                        pendingAction = null
+                    },
+                    title = { 
+                        Text("${pendingAction!!.emoji} ${pendingAction!!.title}")
+                    },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = dialogInputText,
+                                onValueChange = { dialogInputText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Typ of gebruik spraak...") },
+                                singleLine = false,
+                                maxLines = 3
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = {
+                                    pendingAction?.let { action ->
+                                        launchVoiceInput()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Mic, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Gebruik spraak")
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                if (dialogInputText.isNotBlank()) {
+                                    val action = pendingAction!!
+                                    val fullQuery = if (action.query.isNotEmpty()) {
+                                        "${action.query} $dialogInputText"
+                                    } else {
+                                        dialogInputText
+                                    }
+                                    viewModel.sendMessage(fullQuery)
+                                }
+                                showInputDialog = false
+                                pendingAction = null
+                            },
+                            enabled = dialogInputText.isNotBlank()
+                        ) {
+                            Text("Verstuur")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { 
+                            showInputDialog = false
+                            pendingAction = null
+                        }) {
+                            Text("Annuleren")
+                        }
+                    }
+                )
+            }
             
             // Chat Messages
             LazyColumn(
@@ -192,6 +319,20 @@ fun ChatScreen(
                     )
                     
                     Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Voice input button
+                    IconButton(
+                        onClick = { launchVoiceInput() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Spraak invoer",
+                            tint = PrimaryBlue
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(4.dp))
                     
                     FloatingActionButton(
                         onClick = {
@@ -335,4 +476,26 @@ fun ChatBubble(
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
+}
+
+private fun startVoiceRecognition(
+    context: android.content.Context,
+    launcher: androidx.activity.result.ActivityResultLauncher<Intent>
+) {
+    if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        Toast.makeText(context, "Spraakherkenning niet beschikbaar", Toast.LENGTH_SHORT).show()
+        return
+    }
+    
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "nl-NL")
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "Spreek je bericht in...")
+    }
+    
+    try {
+        launcher.launch(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Kon spraakherkenning niet starten", Toast.LENGTH_SHORT).show()
+    }
 }

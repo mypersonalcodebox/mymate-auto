@@ -1,18 +1,100 @@
 package com.mymate.auto.data.repository
 
+import android.util.Log
 import com.mymate.auto.data.local.ChatDao
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.model.QuickActions
 import com.mymate.auto.data.remote.MyMateApiClient
+import com.mymate.auto.data.remote.OpenClawWebSocket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class ChatRepository(
     private val chatDao: ChatDao,
     private val apiClient: MyMateApiClient,
     private val preferencesManager: PreferencesManager
 ) {
+    companion object {
+        private const val TAG = "ChatRepository"
+    }
+    
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // OpenClaw WebSocket client
+    private var openClawWebSocket: OpenClawWebSocket? = null
+    
+    private val _webSocketState = MutableStateFlow(OpenClawWebSocket.ConnectionState.DISCONNECTED)
+    val webSocketState: StateFlow<OpenClawWebSocket.ConnectionState> = _webSocketState
+    
+    init {
+        // Initialize WebSocket connection if enabled
+        scope.launch {
+            if (preferencesManager.getUseOpenClawWebSocketSync()) {
+                initializeOpenClawWebSocket()
+            }
+        }
+    }
+    
+    private suspend fun initializeOpenClawWebSocket() {
+        val gatewayUrl = preferencesManager.getGatewayUrlSync()
+        val token = preferencesManager.getGatewayTokenSync()
+        val sessionKey = preferencesManager.getSessionKeySync()
+        
+        Log.d(TAG, "Initializing OpenClaw WebSocket: $gatewayUrl")
+        
+        openClawWebSocket?.cleanup()
+        openClawWebSocket = OpenClawWebSocket(
+            gatewayUrl = gatewayUrl,
+            authToken = token
+        ).apply {
+            setSessionKey(sessionKey)
+            
+            // Collect connection state
+            scope.launch {
+                connectionState.collect { state ->
+                    Log.d(TAG, "WebSocket state: $state")
+                    _webSocketState.value = state
+                }
+            }
+            
+            // Collect chat responses and save to database
+            scope.launch {
+                chatResponses.collect { response ->
+                    if (response.isComplete && response.content.isNotEmpty()) {
+                        val botMessage = ChatMessage(
+                            content = response.content,
+                            isFromUser = false
+                        )
+                        chatDao.insertMessage(botMessage)
+                    }
+                }
+            }
+            
+            connect(autoReconnect = true)
+        }
+    }
+    
+    fun connectWebSocket() {
+        scope.launch {
+            if (openClawWebSocket == null) {
+                initializeOpenClawWebSocket()
+            } else {
+                openClawWebSocket?.connect(autoReconnect = true)
+            }
+        }
+    }
+    
+    fun disconnectWebSocket() {
+        openClawWebSocket?.disconnect()
+    }
     
     fun getRecentMessages(limit: Int = 100): Flow<List<ChatMessage>> {
         return chatDao.getRecentMessages(limit)
@@ -39,7 +121,51 @@ class ChatRepository(
             preferencesManager.incrementActionUsage(it)
         }
         
-        // Send to API
+        // Try WebSocket first if enabled and connected
+        val useWebSocket = preferencesManager.getUseOpenClawWebSocketSync()
+        if (useWebSocket && _webSocketState.value == OpenClawWebSocket.ConnectionState.CONNECTED) {
+            Log.d(TAG, "Sending via OpenClaw WebSocket")
+            return sendViaWebSocket(message, quickActionId)
+        }
+        
+        // Fallback to HTTP webhook
+        Log.d(TAG, "Sending via HTTP webhook")
+        return sendViaWebhook(message, quickActionId)
+    }
+    
+    private suspend fun sendViaWebSocket(
+        message: String,
+        quickActionId: String?
+    ): Result<ChatMessage> {
+        val ws = openClawWebSocket ?: return Result.failure(
+            IllegalStateException("WebSocket not initialized")
+        )
+        
+        val sessionKey = preferencesManager.getSessionKeySync()
+        val result = ws.sendChatMessage(message, sessionKey)
+        
+        return result.fold(
+            onSuccess = { reply ->
+                val botMessage = ChatMessage(
+                    content = reply,
+                    isFromUser = false,
+                    quickActionId = quickActionId
+                )
+                chatDao.insertMessage(botMessage)
+                Result.success(botMessage)
+            },
+            onFailure = { error ->
+                Log.e(TAG, "WebSocket send failed: ${error.message}", error)
+                // Fallback to webhook on WebSocket failure
+                sendViaWebhook(message, quickActionId)
+            }
+        )
+    }
+    
+    private suspend fun sendViaWebhook(
+        message: String,
+        quickActionId: String?
+    ): Result<ChatMessage> {
         val webhookUrl = preferencesManager.getWebhookUrlSync()
         val result = apiClient.sendMessage(webhookUrl, message, quickActionId)
         
@@ -88,5 +214,18 @@ class ChatRepository(
             compareByDescending<QuickAction> { it.usageCount }
                 .thenByDescending { it.lastUsed }
         )
+    }
+    
+    fun cleanup() {
+        openClawWebSocket?.cleanup()
+        openClawWebSocket = null
+    }
+    
+    suspend fun reinitializeWebSocket() {
+        openClawWebSocket?.cleanup()
+        openClawWebSocket = null
+        if (preferencesManager.getUseOpenClawWebSocketSync()) {
+            initializeOpenClawWebSocket()
+        }
     }
 }
