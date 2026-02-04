@@ -135,7 +135,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("🧪 Test verbinding")
                 .addText("Controleer of gateway bereikbaar is")
                 .setOnClickListener {
-                    screenManager.push(ConnectionTestScreen(carContext, gatewayHost, gatewayPort))
+                    screenManager.push(ConnectionTestScreen(carContext, gatewayUrl))
                 }
                 .build()
         )
@@ -150,8 +150,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
 
 class ConnectionTestScreen(
     carContext: CarContext,
-    private val host: String,
-    private val port: Int
+    private val gatewayUrl: String
 ) : Screen(carContext) {
     
     private val TAG = "ConnectionTestScreen"
@@ -169,6 +168,11 @@ class ConnectionTestScreen(
     private fun testConnection() {
         Thread {
             try {
+                // Parse host and port from URL (e.g., "ws://host:port" or "http://host:port")
+                val url = java.net.URI(gatewayUrl)
+                val host = url.host ?: throw IllegalArgumentException("Geen host in URL")
+                val port = if (url.port > 0) url.port else 18789
+                
                 val socket = java.net.Socket()
                 socket.connect(java.net.InetSocketAddress(host, port), 5000)
                 socket.close()
@@ -176,7 +180,7 @@ class ConnectionTestScreen(
                 testComplete = true
             } catch (e: Exception) {
                 Log.e(TAG, "Connection test failed", e)
-                testStatus = "❌ Verbinding mislukt\n\n${e.localizedMessage}\n\nControleer:\n• Is de gateway actief?\n• Ben je verbonden met Tailscale?\n• Is het IP-adres correct?"
+                testStatus = "❌ Verbinding mislukt\n\n${e.localizedMessage}\n\nControleer:\n• Is de gateway actief?\n• Ben je verbonden met Tailscale?\n• Is de URL correct?"
                 testComplete = true
             }
             

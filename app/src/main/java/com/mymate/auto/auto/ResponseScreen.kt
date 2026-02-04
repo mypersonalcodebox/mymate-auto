@@ -9,6 +9,8 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.mymate.auto.data.local.PreferencesManager
+import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -24,9 +26,9 @@ class ResponseScreen(
     private var ttsReady = false
     private val isDestroyed = AtomicBoolean(false)
     
-    private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
+    private val preferencesManager = PreferencesManager(carContext)
     private val ttsEnabled: Boolean
-        get() = prefs.getBoolean("tts_enabled", true)
+        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
     init {
         try {

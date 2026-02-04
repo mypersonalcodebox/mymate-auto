@@ -10,7 +10,9 @@ import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.gson.Gson
+import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ConversationMessage
+import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -36,15 +38,13 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
-    private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
-    private val gatewayHost: String
-        get() = prefs.getString("gateway_host", "") ?: ""
-    private val gatewayPort: Int
-        get() = prefs.getInt("gateway_port", 18789)
-    private val authToken: String
-        get() = prefs.getString("auth_token", "") ?: ""
+    private val preferencesManager = PreferencesManager(carContext)
+    private val gatewayUrl: String
+        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
+    private val gatewayToken: String
+        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
     private val ttsEnabled: Boolean
-        get() = prefs.getBoolean("tts_enabled", true)
+        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
     private val isLoading = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
@@ -207,13 +207,26 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         val json = gson.toJson(requestBody)
         val body = json.toRequestBody("application/json".toMediaType())
         
-        val url = "http://$gatewayHost:18791/auto"
+        // Build HTTP URL from gateway URL (convert ws:// to http://, wss:// to https://)
+        val httpUrl = try {
+            val uri = java.net.URI(gatewayUrl)
+            val scheme = when (uri.scheme) {
+                "ws" -> "http"
+                "wss" -> "https"
+                else -> uri.scheme
+            }
+            val port = if (uri.port > 0) uri.port else 18789
+            "$scheme://${uri.host}:$port/hooks/agent"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing gateway URL", e)
+            gatewayUrl
+        }
         
         val request = Request.Builder()
-            .url(url)
+            .url(httpUrl)
             .post(body)
             .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer $authToken")
+            .addHeader("Authorization", "Bearer $gatewayToken")
             .build()
         
         Log.d(TAG, "Sending conversation message: $message")
