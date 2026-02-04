@@ -22,6 +22,7 @@ import com.mymate.auto.ui.theme.PrimaryBlue
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToCrashLogs: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -133,12 +134,24 @@ fun SettingsScreen(
             
             Divider(modifier = Modifier.padding(vertical = 8.dp))
             
+            // Debug Section
+            SettingsSection(title = "Debug") {
+                SettingsItem(
+                    icon = Icons.Default.BugReport,
+                    title = "Crash Logs",
+                    subtitle = "Bekijk en deel crash rapporten",
+                    onClick = onNavigateToCrashLogs
+                )
+            }
+            
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
             // About Section
             SettingsSection(title = "Over") {
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "Versie",
-                    subtitle = "2.0",
+                    subtitle = "2.9 (met crash logging)",
                     onClick = { }
                 )
                 

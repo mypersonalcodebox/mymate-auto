@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.ui.chat.ChatScreen
+import com.mymate.auto.ui.crashlogs.CrashLogsScreen
 import com.mymate.auto.ui.settings.SettingsScreen
 import com.mymate.auto.ui.theme.MyMateAutoTheme
 import kotlinx.coroutines.flow.first
@@ -63,6 +64,17 @@ fun MyMateApp() {
         composable("settings") {
             SettingsScreen(
                 onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToCrashLogs = {
+                    navController.navigate("crashlogs")
+                }
+            )
+        }
+        
+        composable("crashlogs") {
+            CrashLogsScreen(
+                onBack = {
                     navController.popBackStack()
                 }
             )
