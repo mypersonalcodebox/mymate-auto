@@ -39,7 +39,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     
     private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
     private val webhookUrl: String
-        get() = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") ?: "http://100.124.24.27:18791/auto"
+        get() = prefs.getString("webhook_url", "") ?: ""
     private val ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
     
@@ -339,7 +339,7 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
     
     private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
     private val webhookUrl: String
-        get() = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") ?: "http://100.124.24.27:18791/auto"
+        get() = prefs.getString("webhook_url", "") ?: ""
     private val ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
     

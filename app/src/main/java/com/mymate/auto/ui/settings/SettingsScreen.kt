@@ -220,7 +220,7 @@ fun SettingsScreen(
                     value = tempWebhookUrl,
                     onValueChange = { tempWebhookUrl = it },
                     label = { Text("URL") },
-                    placeholder = { Text("http://100.124.24.27:18789/hooks/agent") },
+                    placeholder = { Text("http://your-gateway:18789/hooks/agent") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth()
@@ -261,7 +261,7 @@ fun SettingsScreen(
                         value = tempGatewayUrl,
                         onValueChange = { tempGatewayUrl = it },
                         label = { Text("URL") },
-                        placeholder = { Text("ws://100.124.24.27:18789") },
+                        placeholder = { Text("ws://your-gateway:18789") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                         modifier = Modifier.fillMaxWidth()

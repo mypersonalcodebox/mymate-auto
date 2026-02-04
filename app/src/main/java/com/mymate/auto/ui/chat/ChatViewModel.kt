@@ -10,6 +10,7 @@ import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.remote.MyMateApiClient
 import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.data.repository.ChatRepository
+import com.mymate.auto.util.NetworkUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 

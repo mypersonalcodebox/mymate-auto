@@ -137,7 +137,7 @@ class MyMateSession : Session() {
     
     private fun sendParkingNotification(location: Location?) {
         val prefs = carContext.getSharedPreferences("mymate_prefs", Context.MODE_PRIVATE)
-        val webhookUrl = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") 
+        val webhookUrl = prefs.getString("webhook_url", "") 
             ?: return
         
         val client = OkHttpClient.Builder()

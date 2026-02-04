@@ -110,6 +110,12 @@ class MyMateApiClient {
             
             Result.success(apiResponse)
             
+        } catch (e: SocketTimeoutException) {
+            Result.failure(TimeoutException("Verbinding timeout: ${e.message}"))
+        } catch (e: java.net.UnknownHostException) {
+            Result.failure(GatewayUnreachableException("Host niet gevonden: ${e.message}"))
+        } catch (e: java.net.ConnectException) {
+            Result.failure(GatewayUnreachableException("Kan niet verbinden: ${e.message}"))
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -66,12 +66,18 @@ class RemindersViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun completeReminder(reminder: Reminder) {
         viewModelScope.launch {
+            // Cancel the scheduled notification
+            reminderScheduler.cancel(reminder.id)
+            
             if (reminder.repeatType == RepeatType.NONE) {
                 reminderDao.markCompleted(reminder.id)
             } else {
                 // For repeating reminders, schedule next occurrence
                 val nextTrigger = calculateNextTrigger(reminder.triggerTime, reminder.repeatType)
-                reminderDao.update(reminder.copy(triggerTime = nextTrigger))
+                val updatedReminder = reminder.copy(triggerTime = nextTrigger)
+                reminderDao.update(updatedReminder)
+                // Schedule the next notification
+                reminderScheduler.schedule(updatedReminder)
             }
             _uiState.update { it.copy(message = "✓ Afgerond") }
         }
@@ -82,6 +88,8 @@ class RemindersViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun deleteReminder(reminder: Reminder) {
         viewModelScope.launch {
+            // Cancel the scheduled notification
+            reminderScheduler.cancel(reminder.id)
             reminderDao.delete(reminder)
             _uiState.update { it.copy(message = "Verwijderd") }
         }
@@ -92,7 +100,12 @@ class RemindersViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun updateReminder(reminder: Reminder) {
         viewModelScope.launch {
+            // Cancel old alarm and schedule new one
+            reminderScheduler.cancel(reminder.id)
             reminderDao.update(reminder)
+            if (!reminder.isCompleted) {
+                reminderScheduler.schedule(reminder)
+            }
         }
     }
     

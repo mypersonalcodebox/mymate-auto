@@ -43,6 +43,7 @@ import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.ui.theme.*
+import com.mymate.auto.util.NetworkUtils
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -303,34 +304,18 @@ fun ChatScreen(
                 }
             }
             
-            // Error display
+            // Error display with specific messages and retry
             AnimatedVisibility(visible = uiState.error != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = ErrorRed.copy(alpha = 0.2f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Error,
-                            contentDescription = null,
-                            tint = ErrorRed
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            uiState.error ?: "",
-                            color = ErrorRed,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { viewModel.clearError() }) {
-                            Icon(Icons.Default.Close, contentDescription = "Sluiten")
+                ErrorCard(
+                    error = uiState.error,
+                    isRetryable = uiState.isRetryable,
+                    onRetry = { 
+                        uiState.lastMessage?.let { msg ->
+                            viewModel.sendMessage(msg)
                         }
-                    }
-                }
+                    },
+                    onDismiss = { viewModel.clearError() }
+                )
             }
             
             // Loading indicator
@@ -539,6 +524,78 @@ fun ChatBubble(
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
+}
+
+@Composable
+fun ErrorCard(
+    error: String?,
+    isRetryable: Boolean,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (error == null) return
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = ErrorRed.copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Error,
+                    contentDescription = null,
+                    tint = ErrorRed,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = error,
+                    color = ErrorRed,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Sluiten",
+                        tint = ErrorRed.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            
+            if (isRetryable) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onRetry()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = PrimaryBlue
+                    ),
+                    border = BorderStroke(1.dp, PrimaryBlue)
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Opnieuw proberen")
+                }
+            }
+        }
+    }
 }
 
 private fun startVoiceRecognition(

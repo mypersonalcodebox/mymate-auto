@@ -15,7 +15,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         set(value) = prefs.edit().putBoolean("tts_enabled", value).apply()
     
     private var gatewayHost: String
-        get() = prefs.getString("gateway_host", "100.124.24.27") ?: "100.124.24.27"
+        get() = prefs.getString("gateway_host", "") ?: ""
         set(value) = prefs.edit().putString("gateway_host", value).apply()
     
     private var gatewayPort: Int
@@ -23,8 +23,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         set(value) = prefs.edit().putInt("gateway_port", value).apply()
     
     private var webhookUrl: String
-        get() = prefs.getString("webhook_url", "http://100.124.24.27:18791/auto") 
-            ?: "http://100.124.24.27:18791/auto"
+        get() = prefs.getString("webhook_url", "") ?: ""
         set(value) = prefs.edit().putString("webhook_url", value).apply()
     
     override fun onGetTemplate(): Template {

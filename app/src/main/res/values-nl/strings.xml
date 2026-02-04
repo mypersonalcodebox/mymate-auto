@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyMate</string>
+    <string name="app_description">Jouw persoonlijke assistent voor Android Auto</string>
+    
+    <!-- Chat -->
+    <string name="chat_placeholder">Typ een bericht...</string>
+    <string name="chat_send">Verstuur</string>
+    <string name="chat_clear">Wis geschiedenis</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_webhook_url">Webhook URL</string>
+    <string name="settings_tts">Text-to-Speech</string>
+    <string name="settings_notifications">Notificaties</string>
+    <string name="settings_dark_mode">Donkere modus</string>
+    <string name="settings_gateway_host">Gateway host</string>
+    <string name="settings_auth_token">Auth token</string>
+    <string name="settings_language">Taal</string>
+    <string name="settings_voice">Steminstellingen</string>
+    <string name="settings_auto_tts">Automatische spraak</string>
+    <string name="settings_save">Opslaan</string>
+    <string name="settings_reset">Resetten</string>
+    <string name="settings_about">Over</string>
+    <string name="settings_version">Versie</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_permissions">Machtigingen</string>
+    
+    <!-- Connection -->
+    <string name="connection_connected">Verbonden</string>
+    <string name="connection_connecting">Verbinden...</string>
+    <string name="connection_disconnected">Niet verbonden</string>
+    <string name="connection_error">Verbindingsfout</string>
+    <string name="connection_retry">Opnieuw proberen</string>
+    <string name="connection_timeout">Verbinding timeout</string>
+    
+    <!-- Quick Actions -->
+    <string name="action_agenda">Agenda vandaag</string>
+    <string name="action_mail">Ongelezen mail</string>
+    <string name="action_weather">Weer</string>
+    <string name="action_home">Onderweg naar huis</string>
+    <string name="action_remind">Herinner me</string>
+    <string name="action_shopping">Boodschappenlijst</string>
+    <string name="action_news">Nieuws briefing</string>
+    <string name="action_expenses">Uitgaven vandaag</string>
+    <string name="action_traffic">Verkeer</string>
+    <string name="action_call">Bel contact</string>
+    <string name="action_message">Stuur bericht</string>
+    <string name="action_appointment">Volgende afspraak</string>
+    <string name="action_music">Speel muziek</string>
+    <string name="action_location">Waar ben ik</string>
+    
+    <!-- Error Messages -->
+    <string name="error_generic">Er is een fout opgetreden</string>
+    <string name="error_unknown">Onbekende fout</string>
+    <string name="error_network">Netwerkfout</string>
+    <string name="error_server">Serverfout</string>
+    <string name="error_timeout">Verzoek verlopen</string>
+    <string name="error_no_response">Geen antwoord ontvangen</string>
+    <string name="error_invalid_response">Ongeldig antwoord</string>
+    <string name="error_processing">Fout bij verwerken antwoord</string>
+    <string name="error_sending">Fout bij verzenden bericht</string>
+    <string name="error_loading">Fout bij laden gegevens</string>
+    <string name="error_saving">Fout bij opslaan gegevens</string>
+    <string name="error_location">Fout bij ophalen locatie</string>
+    <string name="error_tts">Spraakfout</string>
+    <string name="error_parking">Fout bij opslaan parkeerlocatie</string>
+    
+    <!-- Permission Requests -->
+    <string name="permission_location_title">Locatietoestemming</string>
+    <string name="permission_location_message">MyMate heeft locatietoegang nodig om parkeerlocaties op te slaan en locatiegebaseerde functies te bieden.</string>
+    <string name="permission_location_denied">Geen locatie permissie</string>
+    <string name="permission_microphone_title">Microfoontoestemming</string>
+    <string name="permission_microphone_message">MyMate heeft microfoontoegang nodig voor spraakopdrachten.</string>
+    <string name="permission_microphone_denied">Geen microfoon permissie</string>
+    <string name="permission_notification_title">Meldingstoestemming</string>
+    <string name="permission_notification_message">MyMate heeft meldingstoestemming nodig om herinneringen en updates te sturen.</string>
+    <string name="permission_notification_denied">Geen meldingstoestemming</string>
+    <string name="permission_required">Toestemming vereist</string>
+    <string name="permission_grant">Toestemming geven</string>
+    <string name="permission_settings">Instellingen openen</string>
+    
+    <!-- Empty States -->
+    <string name="empty_messages">Nog geen berichten</string>
+    <string name="empty_messages_hint">Start een gesprek met MyMate</string>
+    <string name="empty_reminders">Geen herinneringen</string>
+    <string name="empty_reminders_hint">Je hebt nog geen herinneringen</string>
+    <string name="empty_reminders_open">Geen openstaande herinneringen</string>
+    <string name="empty_parking">Geen opgeslagen locaties</string>
+    <string name="empty_parking_hint">Sla je parkeerlocatie op wanneer je parkeert</string>
+    <string name="empty_memories">Geen memories gevonden</string>
+    <string name="empty_memories_hint">MyMate onthoudt belangrijke dingen voor je</string>
+    <string name="empty_search">Geen resultaten gevonden</string>
+    <string name="empty_search_hint">Probeer een andere zoekterm</string>
+    
+    <!-- Parking -->
+    <string name="parking_title">Parkeren</string>
+    <string name="parking_save">Locatie opslaan</string>
+    <string name="parking_navigate">Navigeren</string>
+    <string name="parking_delete">Verwijderen</string>
+    <string name="parking_saved">Parkeerlocatie opgeslagen</string>
+    <string name="parking_no_permission">Kan parkeerlocatie niet opslaan zonder locatiepermissie</string>
+    
+    <!-- Reminders -->
+    <string name="reminders_title">Herinneringen</string>
+    <string name="reminders_add">Herinnering toevoegen</string>
+    <string name="reminders_complete">Voltooien</string>
+    <string name="reminders_delete">Verwijderen</string>
+    <string name="reminders_show_completed">Toon voltooide</string>
+    <string name="reminders_hide_completed">Verberg voltooide</string>
+    
+    <!-- Memories -->
+    <string name="memories_title">Memories</string>
+    <string name="memories_add">Memory toevoegen</string>
+    <string name="memories_search">Memories zoeken</string>
+    <string name="memories_delete">Verwijderen</string>
+    <string name="memories_category_todo">Te doen</string>
+    <string name="memories_category_note">Notitie</string>
+    <string name="memories_category_event">Gebeurtenis</string>
+    <string name="memories_category_person">Persoon</string>
+    <string name="memories_category_place">Plaats</string>
+    
+    <!-- General UI -->
+    <string name="ok">OK</string>
+    <string name="cancel">Annuleren</string>
+    <string name="yes">Ja</string>
+    <string name="no">Nee</string>
+    <string name="back">Terug</string>
+    <string name="close">Sluiten</string>
+    <string name="loading">Laden...</string>
+    <string name="processing">Verwerken...</string>
+    <string name="done">Klaar</string>
+    <string name="retry">Opnieuw</string>
+    <string name="refresh">Vernieuwen</string>
+    <string name="search">Zoeken</string>
+    <string name="delete">Verwijderen</string>
+    <string name="edit">Bewerken</string>
+    <string name="save">Opslaan</string>
+    <string name="share">Delen</string>
+</resources>
