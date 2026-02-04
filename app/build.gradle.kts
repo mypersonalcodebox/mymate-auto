@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.mymate.auto"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.mymate.auto"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 13
-        versionName = "2.9"
+        targetSdk = 35
+        versionCode = 14
+        versionName = "2.10"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -52,7 +52,7 @@ android {
     }
     
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.4"
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
 
@@ -64,13 +64,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
-    // Jetpack Compose
-    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
+    // Jetpack Compose - use newer BOM for Android 16 compatibility
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.animation:animation-core")
     debugImplementation("androidx.compose.ui:ui-tooling")
     
     // Navigation
