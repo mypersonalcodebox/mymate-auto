@@ -11,7 +11,7 @@ import okhttp3.*
 import java.util.concurrent.TimeUnit
 
 class WebSocketManager(
-    private val baseUrl: String = "ws://100.124.24.27:18791"
+    private val baseUrl: String = "ws://your-gateway:18791"
 ) {
     
     private val client = OkHttpClient.Builder()

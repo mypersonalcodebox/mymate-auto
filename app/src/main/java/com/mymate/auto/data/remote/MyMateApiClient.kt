@@ -3,6 +3,9 @@ package com.mymate.auto.data.remote
 import com.google.gson.Gson
 import com.mymate.auto.data.model.ApiRequest
 import com.mymate.auto.data.model.ApiResponse
+import com.mymate.auto.util.AuthenticationException
+import com.mymate.auto.util.GatewayUnreachableException
+import com.mymate.auto.util.TimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -10,6 +13,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -18,7 +22,7 @@ class MyMateApiClient {
     
     companion object {
         // Default token for OpenClaw Gateway authentication
-        private const val DEFAULT_AUTH_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
+        private const val DEFAULT_AUTH_TOKEN = ""
     }
     
     private val client = OkHttpClient.Builder()
@@ -81,9 +85,15 @@ class MyMateApiClient {
             }
             
             if (!response.isSuccessful) {
-                return@withContext Result.failure(
-                    IOException("HTTP ${response.code}: ${response.message}")
-                )
+                val exception = when (response.code) {
+                    401 -> AuthenticationException("Ongeldige of verlopen token (401)")
+                    403 -> AuthenticationException("Toegang geweigerd (403)")
+                    408 -> TimeoutException("Server timeout (408)")
+                    502, 503, 504 -> GatewayUnreachableException("Gateway niet beschikbaar (${response.code})")
+                    in 500..599 -> GatewayUnreachableException("Server fout (${response.code})")
+                    else -> IOException("HTTP ${response.code}: ${response.message}")
+                }
+                return@withContext Result.failure(exception)
             }
             
             val responseBody = response.body?.string()

@@ -140,7 +140,7 @@ fun ChatScreen(
                     
                     Box {
                         IconButton(onClick = { showFeaturesMenu = true }) {
-                            Icon(Icons.Default.Apps, contentDescription = "Features")
+                            Icon(Icons.Default.Apps, contentDescription = "Functies")
                         }
                         
                         DropdownMenu(

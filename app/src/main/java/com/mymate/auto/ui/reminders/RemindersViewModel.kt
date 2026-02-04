@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.mymate.auto.data.local.AppDatabase
 import com.mymate.auto.data.model.Reminder
 import com.mymate.auto.data.model.RepeatType
+import com.mymate.auto.service.ReminderScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.*
@@ -14,6 +15,7 @@ class RemindersViewModel(application: Application) : AndroidViewModel(applicatio
     
     private val database = AppDatabase.getInstance(application)
     private val reminderDao = database.reminderDao()
+    private val reminderScheduler = ReminderScheduler(application)
     
     val activeReminders: Flow<List<Reminder>> = reminderDao.getActiveReminders()
     val allReminders: Flow<List<Reminder>> = reminderDao.getAllReminders()
@@ -39,7 +41,12 @@ class RemindersViewModel(application: Application) : AndroidViewModel(applicatio
                 triggerTime = triggerTime,
                 repeatType = repeatType
             )
-            reminderDao.insert(reminder)
+            val id = reminderDao.insert(reminder)
+            
+            // Schedule local notification
+            val savedReminder = reminder.copy(id = id)
+            reminderScheduler.schedule(savedReminder)
+            
             _uiState.update { it.copy(message = "Herinnering toegevoegd!") }
             
             // TODO: Sync with OpenClaw cron for server-side reminders

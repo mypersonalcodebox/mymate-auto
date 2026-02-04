@@ -1,39 +1,140 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyMate</string>
-    <string name="app_description">Jouw persoonlijke assistent voor Android Auto</string>
+    <string name="app_description">Your personal assistant for Android Auto</string>
     
     <!-- Chat -->
-    <string name="chat_placeholder">Typ een bericht...</string>
-    <string name="chat_send">Verstuur</string>
-    <string name="chat_clear">Wis geschiedenis</string>
+    <string name="chat_placeholder">Type a message...</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_clear">Clear history</string>
     
     <!-- Settings -->
-    <string name="settings_title">Instellingen</string>
+    <string name="settings_title">Settings</string>
     <string name="settings_webhook_url">Webhook URL</string>
     <string name="settings_tts">Text-to-Speech</string>
-    <string name="settings_notifications">Notificaties</string>
-    <string name="settings_dark_mode">Donkere modus</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_gateway_host">Gateway host</string>
+    <string name="settings_auth_token">Auth token</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_voice">Voice settings</string>
+    <string name="settings_auto_tts">Auto Text-to-Speech</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_permissions">Permissions</string>
     
     <!-- Connection -->
-    <string name="connection_connected">Verbonden</string>
-    <string name="connection_connecting">Verbinden...</string>
-    <string name="connection_disconnected">Niet verbonden</string>
-    <string name="connection_error">Verbindingsfout</string>
+    <string name="connection_connected">Connected</string>
+    <string name="connection_connecting">Connecting...</string>
+    <string name="connection_disconnected">Not connected</string>
+    <string name="connection_error">Connection error</string>
+    <string name="connection_retry">Retry</string>
+    <string name="connection_timeout">Connection timed out</string>
     
     <!-- Quick Actions -->
-    <string name="action_agenda">Agenda vandaag</string>
-    <string name="action_mail">Ongelezen mail</string>
-    <string name="action_weather">Weer</string>
-    <string name="action_home">Onderweg naar huis</string>
-    <string name="action_remind">Herinner me</string>
-    <string name="action_shopping">Boodschappenlijst</string>
-    <string name="action_news">Nieuws briefing</string>
-    <string name="action_expenses">Uitgaven vandaag</string>
-    <string name="action_traffic">Verkeer</string>
-    <string name="action_call">Bel contact</string>
-    <string name="action_message">Stuur bericht</string>
-    <string name="action_appointment">Volgende afspraak</string>
-    <string name="action_music">Speel muziek</string>
-    <string name="action_location">Waar ben ik</string>
+    <string name="action_agenda">Today\'s agenda</string>
+    <string name="action_mail">Unread mail</string>
+    <string name="action_weather">Weather</string>
+    <string name="action_home">Heading home</string>
+    <string name="action_remind">Remind me</string>
+    <string name="action_shopping">Shopping list</string>
+    <string name="action_news">News briefing</string>
+    <string name="action_expenses">Today\'s expenses</string>
+    <string name="action_traffic">Traffic</string>
+    <string name="action_call">Call contact</string>
+    <string name="action_message">Send message</string>
+    <string name="action_appointment">Next appointment</string>
+    <string name="action_music">Play music</string>
+    <string name="action_location">Where am I</string>
+    
+    <!-- Error Messages -->
+    <string name="error_generic">An error occurred</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="error_network">Network error</string>
+    <string name="error_server">Server error</string>
+    <string name="error_timeout">Request timed out</string>
+    <string name="error_no_response">No response received</string>
+    <string name="error_invalid_response">Invalid response</string>
+    <string name="error_processing">Error processing response</string>
+    <string name="error_sending">Error sending message</string>
+    <string name="error_loading">Error loading data</string>
+    <string name="error_saving">Error saving data</string>
+    <string name="error_location">Error getting location</string>
+    <string name="error_tts">Text-to-Speech error</string>
+    <string name="error_parking">Error saving parking location</string>
+    
+    <!-- Permission Requests -->
+    <string name="permission_location_title">Location permission</string>
+    <string name="permission_location_message">MyMate needs location access to save parking locations and provide location-based features.</string>
+    <string name="permission_location_denied">Location permission not granted</string>
+    <string name="permission_microphone_title">Microphone permission</string>
+    <string name="permission_microphone_message">MyMate needs microphone access for voice commands.</string>
+    <string name="permission_microphone_denied">Microphone permission not granted</string>
+    <string name="permission_notification_title">Notification permission</string>
+    <string name="permission_notification_message">MyMate needs notification permission to send reminders and updates.</string>
+    <string name="permission_notification_denied">Notification permission not granted</string>
+    <string name="permission_required">Permission required</string>
+    <string name="permission_grant">Grant permission</string>
+    <string name="permission_settings">Open settings</string>
+    
+    <!-- Empty States -->
+    <string name="empty_messages">No messages yet</string>
+    <string name="empty_messages_hint">Start a conversation with MyMate</string>
+    <string name="empty_reminders">No reminders</string>
+    <string name="empty_reminders_hint">You don\'t have any reminders yet</string>
+    <string name="empty_reminders_open">No open reminders</string>
+    <string name="empty_parking">No saved locations</string>
+    <string name="empty_parking_hint">Save your parking location when you park</string>
+    <string name="empty_memories">No memories found</string>
+    <string name="empty_memories_hint">MyMate will remember important things for you</string>
+    <string name="empty_search">No results found</string>
+    <string name="empty_search_hint">Try a different search term</string>
+    
+    <!-- Parking -->
+    <string name="parking_title">Parking</string>
+    <string name="parking_save">Save location</string>
+    <string name="parking_navigate">Navigate</string>
+    <string name="parking_delete">Delete</string>
+    <string name="parking_saved">Parking location saved</string>
+    <string name="parking_no_permission">Cannot save parking location without location permission</string>
+    
+    <!-- Reminders -->
+    <string name="reminders_title">Reminders</string>
+    <string name="reminders_add">Add reminder</string>
+    <string name="reminders_complete">Mark complete</string>
+    <string name="reminders_delete">Delete</string>
+    <string name="reminders_show_completed">Show completed</string>
+    <string name="reminders_hide_completed">Hide completed</string>
+    
+    <!-- Memories -->
+    <string name="memories_title">Memories</string>
+    <string name="memories_add">Add memory</string>
+    <string name="memories_search">Search memories</string>
+    <string name="memories_delete">Delete</string>
+    <string name="memories_category_todo">To-do</string>
+    <string name="memories_category_note">Note</string>
+    <string name="memories_category_event">Event</string>
+    <string name="memories_category_person">Person</string>
+    <string name="memories_category_place">Place</string>
+    
+    <!-- General UI -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="loading">Loading...</string>
+    <string name="processing">Processing...</string>
+    <string name="done">Done</string>
+    <string name="retry">Retry</string>
+    <string name="refresh">Refresh</string>
+    <string name="search">Search</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="save">Save</string>
+    <string name="share">Share</string>
 </resources>

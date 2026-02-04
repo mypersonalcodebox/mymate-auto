@@ -38,12 +38,11 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
     private val gatewayHost: String
-        get() = prefs.getString("gateway_host", "100.124.24.27") ?: "100.124.24.27"
+        get() = prefs.getString("gateway_host", "") ?: ""
     private val gatewayPort: Int
         get() = prefs.getInt("gateway_port", 18789)
     private val authToken: String
-        get() = prefs.getString("auth_token", "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb") 
-            ?: "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
+        get() = prefs.getString("auth_token", "") ?: ""
     private val ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
     

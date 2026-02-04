@@ -254,14 +254,14 @@ fun MemoryCard(
                 }
                 
                 Row {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = "Bewerken",
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Verwijderen",

@@ -30,7 +30,7 @@ import kotlin.random.Random
  * - Then can send chat.send requests and receive events
  */
 class OpenClawWebSocket(
-    private val gatewayUrl: String = "ws://100.124.24.27:18789",
+    private val gatewayUrl: String = "ws://your-gateway:18789",
     private val authToken: String? = null
 ) {
     

@@ -32,14 +32,17 @@ class PreferencesManager(private val context: Context) {
         val USE_OPENCLAW_WEBSOCKET = booleanPreferencesKey("use_openclaw_websocket")
         val SESSION_KEY = stringPreferencesKey("session_key")
         
+        // Onboarding
+        val IS_CONFIGURED = booleanPreferencesKey("is_configured")
+        
         // Parking settings
         val AUTO_SAVE_PARKING = booleanPreferencesKey("auto_save_parking")
         val SEND_PARKING_TO_TELEGRAM = booleanPreferencesKey("send_parking_to_telegram")
         val PARKING_RETENTION_DAYS = intPreferencesKey("parking_retention_days")
         
-        const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
-        const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
-        const val DEFAULT_GATEWAY_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
+        const val DEFAULT_WEBHOOK_URL = ""
+        const val DEFAULT_GATEWAY_URL = "ws://your-gateway:18789"
+        const val DEFAULT_GATEWAY_TOKEN = ""
         const val DEFAULT_SESSION_KEY = "agent:main:mymate"
     }
     
@@ -159,6 +162,21 @@ class PreferencesManager(private val context: Context) {
     
     suspend fun getUseOpenClawWebSocketSync(): Boolean {
         return context.dataStore.data.first()[USE_OPENCLAW_WEBSOCKET] ?: true
+    }
+    
+    // Onboarding
+    val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[IS_CONFIGURED] ?: false
+    }
+    
+    suspend fun setIsConfigured(configured: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[IS_CONFIGURED] = configured
+        }
+    }
+    
+    suspend fun getIsConfiguredSync(): Boolean {
+        return context.dataStore.data.first()[IS_CONFIGURED] ?: false
     }
     
     // Action usage tracking

@@ -248,7 +248,7 @@ fun ReminderCard(
             // Complete button
             IconButton(
                 onClick = onComplete,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     Icons.Default.CheckCircle,
