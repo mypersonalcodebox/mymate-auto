@@ -1,12 +1,17 @@
-package com.mymate.auto.ui.chat
+package com.mymate.auto.ui.conversation
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -29,34 +35,24 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import com.mymate.auto.data.model.ChatMessage
-import com.mymate.auto.data.model.QuickAction
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mymate.auto.data.model.ConversationMessage
 import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.ui.theme.*
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(
-    onNavigateToSettings: () -> Unit,
-    onNavigateToConversation: () -> Unit = {},
-    viewModel: ChatViewModel = viewModel()
+fun ConversationScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: ConversationViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val messages by viewModel.messages.collectAsState(initial = emptyList())
     val connectionState by viewModel.connectionState.collectAsState()
+    val topic by viewModel.conversationTopic.collectAsState()
     
     var inputText by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -64,10 +60,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
-    // Voice input state
-    var pendingAction by remember { mutableStateOf<QuickAction?>(null) }
-    var showInputDialog by remember { mutableStateOf(false) }
-    var dialogInputText by remember { mutableStateOf("") }
+    var showNewConversationDialog by remember { mutableStateOf(false) }
     
     // Voice recognition launcher
     val speechLauncher = rememberLauncherForActivityResult(
@@ -75,20 +68,7 @@ fun ChatScreen(
     ) { result ->
         val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (!spokenText.isNullOrBlank()) {
-            if (pendingAction != null) {
-                // Complete the pending action with voice input
-                val action = pendingAction!!
-                val fullQuery = if (action.query.isNotEmpty()) {
-                    "${action.query} $spokenText"
-                } else {
-                    spokenText
-                }
-                viewModel.sendMessage(fullQuery)
-                pendingAction = null
-            } else {
-                // Direct voice input
-                viewModel.sendMessage(spokenText)
-            }
+            viewModel.sendMessage(spokenText)
         }
     }
     
@@ -118,29 +98,81 @@ fun ChatScreen(
         }
     }
     
+    // New conversation confirmation dialog
+    if (showNewConversationDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewConversationDialog = false },
+            title = { Text("Nieuw gesprek starten?") },
+            text = { 
+                Text("Dit wist de huidige gespreksgeschiedenis. De AI verliest de context van dit gesprek.") 
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.startNewConversation()
+                        showNewConversationDialog = false
+                    }
+                ) {
+                    Text("Nieuw gesprek", color = ErrorRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewConversationDialog = false }) {
+                    Text("Annuleren")
+                }
+            }
+        )
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("MyMate", fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        ConnectionIndicator(connectionState)
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("💬 Gesprek", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            ConversationConnectionIndicator(connectionState)
+                        }
+                        topic?.let { t ->
+                            Text(
+                                text = t,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Terug")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 actions = {
-                    // Conversation mode button
-                    IconButton(onClick = onNavigateToConversation) {
-                        Icon(Icons.Default.Chat, contentDescription = "Gesprek modus")
+                    // Message count badge
+                    if (uiState.messageCount > 0) {
+                        Badge(
+                            containerColor = PrimaryBlue,
+                            contentColor = Color.White
+                        ) {
+                            Text("${uiState.messageCount}")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    IconButton(onClick = { viewModel.clearHistory() }) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Wis geschiedenis")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Instellingen")
+                    
+                    // New conversation button
+                    IconButton(
+                        onClick = { showNewConversationDialog = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Nieuw gesprek"
+                        )
                     }
                 }
             )
@@ -151,103 +183,81 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Quick Actions Row
-            QuickActionsRow(
-                actions = uiState.quickActions,
-                onActionClick = { action ->
-                    if (action.query.isEmpty()) {
-                        // Action needs user input - show dialog
-                        pendingAction = action
-                        dialogInputText = ""
-                        showInputDialog = true
-                    } else {
-                        viewModel.executeQuickAction(action)
+            // Context hint for empty conversation
+            if (messages.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Chat,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Start een gesprek",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Stel vragen, bespreek onderwerpen, of vraag om uitleg.\nIk onthoud de context van ons gesprek.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        // Suggestion chips
+                        Text(
+                            "Suggesties:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        SuggestionChip(
+                            onClick = { viewModel.sendMessage("Kun je me helpen met een project? Ik leg eerst uit waar het over gaat.") },
+                            label = { Text("📋 Help met project") }
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SuggestionChip(
+                            onClick = { viewModel.sendMessage("Ik wil iets leren over een onderwerp. Kun je me uitleggen hoe het werkt?") },
+                            label = { Text("📚 Iets leren") }
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SuggestionChip(
+                            onClick = { viewModel.sendMessage("Ik heb een probleem en wil samen brainstormen over oplossingen.") },
+                            label = { Text("💡 Brainstormen") }
+                        )
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            // Input dialog for actions that need user input
-            if (showInputDialog && pendingAction != null) {
-                AlertDialog(
-                    onDismissRequest = { 
-                        showInputDialog = false
-                        pendingAction = null
-                    },
-                    title = { 
-                        Text("${pendingAction!!.emoji} ${pendingAction!!.title}")
-                    },
-                    text = {
-                        Column {
-                            OutlinedTextField(
-                                value = dialogInputText,
-                                onValueChange = { dialogInputText = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Typ of gebruik spraak...") },
-                                singleLine = false,
-                                maxLines = 3
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            TextButton(
-                                onClick = {
-                                    pendingAction?.let { action ->
-                                        launchVoiceInput()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Mic, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Gebruik spraak")
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                if (dialogInputText.isNotBlank()) {
-                                    val action = pendingAction!!
-                                    val fullQuery = if (action.query.isNotEmpty()) {
-                                        "${action.query} $dialogInputText"
-                                    } else {
-                                        dialogInputText
-                                    }
-                                    viewModel.sendMessage(fullQuery)
-                                }
-                                showInputDialog = false
-                                pendingAction = null
-                            },
-                            enabled = dialogInputText.isNotBlank()
-                        ) {
-                            Text("Verstuur")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { 
-                            showInputDialog = false
-                            pendingAction = null
-                        }) {
-                            Text("Annuleren")
-                        }
+                }
+            } else {
+                // Chat Messages
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    state = listState,
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        ConversationBubble(
+                            message = message,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
-                )
-            }
-            
-            // Chat Messages
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                state = listState,
-                reverseLayout = true,
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(messages, key = { it.id }) { message ->
-                    ChatBubble(
-                        message = message,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
                 }
             }
             
@@ -304,7 +314,7 @@ fun ChatScreen(
                         value = inputText,
                         onValueChange = { inputText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Typ een bericht...") },
+                        placeholder = { Text("Stel een vraag of praat verder...") },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(
                             onSend = {
@@ -315,7 +325,8 @@ fun ChatScreen(
                                 }
                             }
                         ),
-                        singleLine = true,
+                        singleLine = false,
+                        maxLines = 4,
                         shape = RoundedCornerShape(24.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = PrimaryBlue,
@@ -325,7 +336,7 @@ fun ChatScreen(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Voice input button - prominent FAB style
+                    // Voice input button
                     FloatingActionButton(
                         onClick = { launchVoiceInput() },
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -364,79 +375,27 @@ fun ChatScreen(
 }
 
 @Composable
-fun ConnectionIndicator(state: OpenClawWebSocket.ConnectionState) {
+fun ConversationConnectionIndicator(state: OpenClawWebSocket.ConnectionState) {
     val (color, text) = when (state) {
-        OpenClawWebSocket.ConnectionState.CONNECTED -> SuccessGreen to "🦞 Gateway"
-        OpenClawWebSocket.ConnectionState.CONNECTING -> WarningYellow to "Verbinden..."
-        OpenClawWebSocket.ConnectionState.HANDSHAKING -> WarningYellow to "Auth..."
-        OpenClawWebSocket.ConnectionState.RECONNECTING -> WarningYellow to "Herverbinden..."
-        OpenClawWebSocket.ConnectionState.ERROR -> ErrorRed to "Fout"
-        OpenClawWebSocket.ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant to "HTTP"
+        OpenClawWebSocket.ConnectionState.CONNECTED -> SuccessGreen to "●"
+        OpenClawWebSocket.ConnectionState.CONNECTING -> WarningYellow to "○"
+        OpenClawWebSocket.ConnectionState.HANDSHAKING -> WarningYellow to "○"
+        OpenClawWebSocket.ConnectionState.RECONNECTING -> WarningYellow to "○"
+        OpenClawWebSocket.ConnectionState.ERROR -> ErrorRed to "●"
+        OpenClawWebSocket.ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant to "○"
     }
     
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            color = color
-        )
-    }
-}
-
-@Composable
-fun QuickActionsRow(
-    actions: List<QuickAction>,
-    onActionClick: (QuickAction) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyRow(
-        modifier = modifier.padding(vertical = 8.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(actions.take(15)) { action ->
-            QuickActionChip(
-                action = action,
-                onClick = { onActionClick(action) }
-            )
-        }
-    }
-}
-
-@Composable
-fun QuickActionChip(
-    action: QuickAction,
-    onClick: () -> Unit
-) {
-    AssistChip(
-        onClick = onClick,
-        label = {
-            Text(
-                "${action.emoji} ${action.title}",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        border = BorderStroke(
-            width = if (action.usageCount > 0) 2.dp else 1.dp,
-            color = if (action.usageCount > 0) PrimaryBlue else MaterialTheme.colorScheme.outline
-        )
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(color)
     )
 }
 
 @Composable
-fun ChatBubble(
-    message: ChatMessage,
+fun ConversationBubble(
+    message: ConversationMessage,
     modifier: Modifier = Modifier
 ) {
     val isUser = message.isFromUser
@@ -463,7 +422,7 @@ fun ChatBubble(
         horizontalAlignment = alignment
     ) {
         Card(
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.widthIn(max = 320.dp),
             shape = shape,
             colors = CardDefaults.cardColors(containerColor = bubbleColor)
         ) {
