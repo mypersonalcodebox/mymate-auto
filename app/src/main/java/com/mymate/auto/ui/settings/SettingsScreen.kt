@@ -1,7 +1,11 @@
 package com.mymate.auto.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -11,11 +15,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mymate.auto.ui.theme.PrimaryBlue
@@ -28,10 +36,13 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val connectionTestState by viewModel.connectionTestState.collectAsState()
+    val webSocketState by viewModel.webSocketState.collectAsState()
     var showWebhookDialog by remember { mutableStateOf(false) }
     var showGatewayDialog by remember { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
     var showSessionKeyDialog by remember { mutableStateOf(false) }
+    var showConnectionTestDialog by remember { mutableStateOf(false) }
     var tempWebhookUrl by remember { mutableStateOf("") }
     var tempGatewayUrl by remember { mutableStateOf("") }
     var tempToken by remember { mutableStateOf("") }
@@ -58,6 +69,12 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
+            // Connection Status Indicator at top
+            ConnectionStatusCard(
+                webSocketState = webSocketState,
+                modifier = Modifier.padding(16.dp)
+            )
+            
             // OpenClaw Gateway Section (primary)
             SettingsSection(title = "🦞 OpenClaw Gateway") {
                 SettingsSwitch(

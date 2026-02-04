@@ -54,24 +54,41 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (message.isBlank()) return
         
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, lastMessage = message) }
+            
+            // Check network connectivity first
+            if (!NetworkUtils.isOnline(getApplication())) {
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        error = getApplication<Application>().getString(com.mymate.auto.R.string.error_no_internet),
+                        isRetryable = true
+                    )
+                }
+                return@launch
+            }
             
             val result = repository.sendMessage(message, quickActionId)
             
             result.fold(
                 onSuccess = {
                     _uiState.update { state ->
-                        state.copy(isLoading = false)
+                        state.copy(isLoading = false, lastMessage = null)
                     }
                     // Refresh quick actions sorting
                     val sortedActions = repository.getSortedQuickActions()
                     _uiState.update { it.copy(quickActions = sortedActions) }
                 },
-                onFailure = { error ->
+                onFailure = { throwable ->
+                    val networkError = NetworkUtils.parseError(throwable)
+                    val errorMessage = NetworkUtils.getErrorMessage(getApplication(), networkError)
+                    val isRetryable = NetworkUtils.isRetryable(networkError)
+                    
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            error = error.localizedMessage ?: "Onbekende fout"
+                            error = errorMessage,
+                            isRetryable = isRetryable
                         )
                     }
                 }
@@ -117,6 +134,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
+    val isRetryable: Boolean = false,
+    val lastMessage: String? = null,
     val quickActions: List<QuickAction> = emptyList(),
     val connectionStatus: String = "Niet verbonden"
 )

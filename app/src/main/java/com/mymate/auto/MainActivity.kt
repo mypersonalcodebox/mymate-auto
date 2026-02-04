@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -20,6 +21,7 @@ import com.mymate.auto.ui.memories.MemoriesScreen
 import com.mymate.auto.ui.parking.ParkingScreen
 import com.mymate.auto.ui.reminders.RemindersScreen
 import com.mymate.auto.ui.settings.SettingsScreen
+import com.mymate.auto.ui.setup.SetupScreen
 import com.mymate.auto.ui.theme.MyMateAutoTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -32,6 +34,9 @@ class MainActivity : ComponentActivity() {
         
         val preferencesManager = PreferencesManager(this)
         
+        // Check if app is configured
+        val isConfigured = runBlocking { preferencesManager.getIsConfiguredSync() }
+        
         setContent {
             val darkMode by preferencesManager.darkMode.collectAsState(
                 initial = runBlocking { preferencesManager.darkMode.first() }
@@ -42,7 +47,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MyMateApp()
+                    MyMateApp(startDestination = if (isConfigured) "chat" else "setup")
                 }
             }
         }
@@ -50,13 +55,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MyMateApp() {
+fun MyMateApp(startDestination: String = "chat") {
     val navController = rememberNavController()
     
     NavHost(
         navController = navController,
-        startDestination = "chat"
+        startDestination = startDestination
     ) {
+        composable("setup") {
+            SetupScreen(
+                onSetupComplete = {
+                    navController.navigate("chat") {
+                        popUpTo("setup") { inclusive = true }
+                    }
+                }
+            )
+        }
+        
         composable("chat") {
             ChatScreen(
                 onNavigateToSettings = {

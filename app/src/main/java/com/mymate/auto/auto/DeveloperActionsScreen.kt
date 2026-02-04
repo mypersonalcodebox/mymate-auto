@@ -11,8 +11,10 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.model.QuickActions
+import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -37,11 +39,11 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
-    private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
+    private val preferencesManager = PreferencesManager(carContext)
     private val webhookUrl: String
-        get() = prefs.getString("webhook_url", "") ?: ""
+        get() = runBlocking { preferencesManager.getWebhookUrlSync() }
     private val ttsEnabled: Boolean
-        get() = prefs.getBoolean("tts_enabled", true)
+        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
     @Volatile
     private var currentResponse: String = ""
@@ -140,23 +142,8 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun getSortedDeveloperActions(): List<QuickAction> {
         return try {
-            val usageJson = prefs.getString("action_usage", "{}") ?: "{}"
-            val lastUsedJson = prefs.getString("action_last_used", "{}") ?: "{}"
-            
-            val type = object : TypeToken<Map<String, Int>>() {}.type
-            val longType = object : TypeToken<Map<String, Long>>() {}.type
-            
-            val usageMap: Map<String, Int> = try {
-                gson.fromJson(usageJson, type) ?: emptyMap()
-            } catch (e: Exception) {
-                emptyMap()
-            }
-            
-            val lastUsedMap: Map<String, Long> = try {
-                gson.fromJson(lastUsedJson, longType) ?: emptyMap()
-            } catch (e: Exception) {
-                emptyMap()
-            }
+            val usageMap: Map<String, Int> = runBlocking { preferencesManager.getActionUsage() }
+            val lastUsedMap: Map<String, Long> = runBlocking { preferencesManager.getActionLastUsed() }
             
             QuickActions.developerActions.map { action ->
                 action.copy(
@@ -175,31 +162,7 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun incrementUsage(actionId: String) {
         try {
-            val usageJson = prefs.getString("action_usage", "{}") ?: "{}"
-            val lastUsedJson = prefs.getString("action_last_used", "{}") ?: "{}"
-            
-            val type = object : TypeToken<MutableMap<String, Int>>() {}.type
-            val longType = object : TypeToken<MutableMap<String, Long>>() {}.type
-            
-            val usageMap: MutableMap<String, Int> = try {
-                gson.fromJson(usageJson, type) ?: mutableMapOf()
-            } catch (e: Exception) {
-                mutableMapOf()
-            }
-            
-            val lastUsedMap: MutableMap<String, Long> = try {
-                gson.fromJson(lastUsedJson, longType) ?: mutableMapOf()
-            } catch (e: Exception) {
-                mutableMapOf()
-            }
-            
-            usageMap[actionId] = (usageMap[actionId] ?: 0) + 1
-            lastUsedMap[actionId] = System.currentTimeMillis()
-            
-            prefs.edit()
-                .putString("action_usage", gson.toJson(usageMap))
-                .putString("action_last_used", gson.toJson(lastUsedMap))
-                .apply()
+            runBlocking { preferencesManager.incrementActionUsage(actionId) }
         } catch (e: Exception) {
             Log.e(TAG, "Error incrementing usage", e)
         }
