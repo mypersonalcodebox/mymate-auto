@@ -34,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.22"
+        private const val CLIENT_VERSION = "2.23"
     }
     
     private val client = OkHttpClient.Builder()
@@ -321,29 +321,38 @@ class OpenClawWebSocket(
             }
             "chat" -> {
                 // Chat message event (streaming or final)
+                // OpenClaw payload structure:
+                // { runId, sessionKey, state: "final"|"delta"|"error", message: { content: [{ type, text }] } }
                 val sk = payload?.get("sessionKey")?.asString ?: sessionKey
-                val content = payload?.get("text")?.asString 
-                    ?: payload?.get("content")?.asString 
-                    ?: ""
-                val isComplete = payload?.get("complete")?.asBoolean ?: true
-                scope.launch {
-                    _chatResponses.emit(ChatResponse(
-                        sessionKey = sk,
-                        content = content,
-                        isComplete = isComplete
-                    ))
+                val state = payload?.get("state")?.asString ?: "final"
+                val isComplete = state == "final"
+                val isError = state == "error"
+                
+                // Extract text from nested message.content[0].text structure
+                var content = ""
+                val message = payload?.getAsJsonObject("message")
+                if (message != null) {
+                    val contentArray = message.getAsJsonArray("content")
+                    if (contentArray != null && contentArray.size() > 0) {
+                        val firstContent = contentArray[0].asJsonObject
+                        content = firstContent?.get("text")?.asString ?: ""
+                    }
                 }
-            }
-            "chat.chunk" -> {
-                // Streaming chunk
-                val sk = payload?.get("sessionKey")?.asString ?: sessionKey
-                val chunk = payload?.get("chunk")?.asString ?: ""
-                scope.launch {
-                    _chatResponses.emit(ChatResponse(
-                        sessionKey = sk,
-                        content = chunk,
-                        isComplete = false
-                    ))
+                
+                // Also check for errorMessage on error state
+                val errorMsg = if (isError) payload?.get("errorMessage")?.asString else null
+                
+                Log.d(TAG, "Chat event: state=$state, content=${content.take(100)}...")
+                
+                if (content.isNotEmpty() || isComplete || isError) {
+                    scope.launch {
+                        _chatResponses.emit(ChatResponse(
+                            sessionKey = sk,
+                            content = content,
+                            isComplete = isComplete,
+                            error = errorMsg
+                        ))
+                    }
                 }
             }
             "presence" -> {
