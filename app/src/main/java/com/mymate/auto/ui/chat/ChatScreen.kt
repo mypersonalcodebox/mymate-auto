@@ -1,6 +1,7 @@
 package com.mymate.auto.ui.chat
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -274,9 +275,9 @@ fun QuickActionChip(
         colors = AssistChipDefaults.assistChipColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
-        border = AssistChipDefaults.assistChipBorder(
-            borderColor = if (action.usageCount > 0) PrimaryBlue else MaterialTheme.colorScheme.outline,
-            borderWidth = if (action.usageCount > 0) 2.dp else 1.dp
+        border = BorderStroke(
+            width = if (action.usageCount > 0) 2.dp else 1.dp,
+            color = if (action.usageCount > 0) PrimaryBlue else MaterialTheme.colorScheme.outline
         )
     )
 }
