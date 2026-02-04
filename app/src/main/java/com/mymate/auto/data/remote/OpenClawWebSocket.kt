@@ -34,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.23"
+        private const val CLIENT_VERSION = "2.24"
     }
     
     private val client = OkHttpClient.Builder()
@@ -323,18 +323,28 @@ class OpenClawWebSocket(
                 // Chat message event (streaming or final)
                 // OpenClaw payload structure:
                 // { runId, sessionKey, state: "final"|"delta"|"error", message: { content: [{ type, text }] } }
+                Log.d(TAG, "=== CHAT EVENT RAW PAYLOAD ===")
+                Log.d(TAG, "Payload: ${payload.toString().take(500)}")
+                
                 val sk = payload?.get("sessionKey")?.asString ?: sessionKey
                 val state = payload?.get("state")?.asString ?: "final"
                 val isComplete = state == "final"
                 val isError = state == "error"
                 
+                Log.d(TAG, "State: $state, isComplete: $isComplete, sessionKey: $sk")
+                
                 // Extract text from nested message.content[0].text structure
                 var content = ""
                 val message = payload?.getAsJsonObject("message")
+                Log.d(TAG, "Message object: ${message?.toString()?.take(200)}")
+                
                 if (message != null) {
                     val contentArray = message.getAsJsonArray("content")
+                    Log.d(TAG, "Content array: ${contentArray?.toString()?.take(200)}")
+                    
                     if (contentArray != null && contentArray.size() > 0) {
                         val firstContent = contentArray[0].asJsonObject
+                        Log.d(TAG, "First content: ${firstContent?.toString()}")
                         content = firstContent?.get("text")?.asString ?: ""
                     }
                 }
@@ -342,14 +352,16 @@ class OpenClawWebSocket(
                 // Also check for errorMessage on error state
                 val errorMsg = if (isError) payload?.get("errorMessage")?.asString else null
                 
-                Log.d(TAG, "Chat event: state=$state, content=${content.take(100)}...")
+                Log.d(TAG, "=== EXTRACTED: content='${content.take(100)}', isComplete=$isComplete ===")
                 
-                if (content.isNotEmpty() || isComplete || isError) {
+                // Only emit final responses (not deltas) to avoid duplicates
+                if (isComplete) {
+                    Log.d(TAG, ">>> EMITTING CHAT RESPONSE: $content")
                     scope.launch {
                         _chatResponses.emit(ChatResponse(
                             sessionKey = sk,
                             content = content,
-                            isComplete = isComplete,
+                            isComplete = true,
                             error = errorMsg
                         ))
                     }
