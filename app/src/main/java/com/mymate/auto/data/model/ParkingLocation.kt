@@ -1,12 +1,19 @@
 package com.mymate.auto.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Represents a saved parking location
  */
-@Entity(tableName = "parking_locations")
+@Entity(
+    tableName = "parking_locations",
+    indices = [
+        Index("isActive"),
+        Index("timestamp")
+    ]
+)
 data class ParkingLocation(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

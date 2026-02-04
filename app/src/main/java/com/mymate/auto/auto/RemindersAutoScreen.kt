@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.mymate.auto.data.local.AppDatabase
 import com.mymate.auto.data.model.Reminder
 import com.mymate.auto.data.model.RepeatType
@@ -14,7 +16,8 @@ import java.util.*
 class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "RemindersAutoScreen"
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val db = AppDatabase.getInstance(carContext)
     private val reminderDao = db.reminderDao()
     private val dateFormat = SimpleDateFormat("EEE d MMM HH:mm", Locale("nl", "NL"))
@@ -30,6 +33,11 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
     private var showCompleted = false
     
     init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
         loadReminders()
     }
     
@@ -262,11 +270,21 @@ class ReminderDetailScreen(
     carContext: CarContext,
     private val reminder: Reminder,
     private val reminderDao: com.mymate.auto.data.local.ReminderDao,
-    private val scope: CoroutineScope,
+    parentScope: CoroutineScope,
     private val onUpdated: () -> Unit
 ) : Screen(carContext) {
     
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val dateFormat = SimpleDateFormat("EEEE d MMMM HH:mm", Locale("nl", "NL"))
+    
+    init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
+    }
     
     override fun onGetTemplate(): Template {
         val triggerTime = dateFormat.format(Date(reminder.triggerTime))

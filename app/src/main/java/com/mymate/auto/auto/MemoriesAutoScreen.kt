@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.mymate.auto.data.local.AppDatabase
 import com.mymate.auto.data.model.Memory
 import com.mymate.auto.data.model.MemoryCategory
@@ -14,7 +16,8 @@ import java.util.*
 class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "MemoriesAutoScreen"
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val db = AppDatabase.getInstance(carContext)
     private val memoryDao = db.memoryDao()
     private val dateFormat = SimpleDateFormat("dd MMM", Locale("nl", "NL"))
@@ -32,6 +35,11 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     private var categories: List<MemoryCategory> = emptyList()
     
     init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
         loadMemories()
     }
     
@@ -255,11 +263,21 @@ class MemoryDetailAutoScreen(
     carContext: CarContext,
     private val memory: Memory,
     private val memoryDao: com.mymate.auto.data.local.MemoryDao,
-    private val scope: CoroutineScope,
+    parentScope: CoroutineScope,
     private val onDeleted: () -> Unit
 ) : Screen(carContext) {
     
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val dateFormat = SimpleDateFormat("EEEE d MMMM HH:mm", Locale("nl", "NL"))
+    
+    init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
+    }
     
     override fun onGetTemplate(): Template {
         val preview = memory.content.take(30)

@@ -10,6 +10,8 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -24,7 +26,8 @@ import java.util.concurrent.TimeUnit
 class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "ParkingAutoScreen"
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val db = AppDatabase.getInstance(carContext)
     private val parkingDao = db.parkingDao()
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(carContext)
@@ -43,6 +46,11 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     private var statusMessage: String? = null
     
     init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
         loadParkingLocations()
     }
     
@@ -236,11 +244,21 @@ class ParkingDetailScreen(
     carContext: CarContext,
     private val location: ParkingLocation,
     private val parkingDao: com.mymate.auto.data.local.ParkingDao,
-    private val scope: CoroutineScope,
+    parentScope: CoroutineScope,
     private val onDeleted: () -> Unit
 ) : Screen(carContext) {
     
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val dateFormat = SimpleDateFormat("EEEE d MMMM HH:mm", Locale("nl", "NL"))
+    
+    init {
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                supervisorJob.cancel()
+            }
+        })
+    }
     
     override fun onGetTemplate(): Template {
         val address = location.address ?: "Onbekende locatie"

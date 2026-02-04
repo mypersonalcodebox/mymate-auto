@@ -1,13 +1,20 @@
 package com.mymate.auto.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Represents a saved memory/note
  * Can be things like "Remember my parking spot is B42" or "My favorite coffee order is..."
  */
-@Entity(tableName = "memories")
+@Entity(
+    tableName = "memories",
+    indices = [
+        Index("category"),
+        Index("updatedAt")
+    ]
+)
 data class Memory(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

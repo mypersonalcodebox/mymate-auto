@@ -1,12 +1,19 @@
 package com.mymate.auto.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * Represents a reminder set by the user
  */
-@Entity(tableName = "reminders")
+@Entity(
+    tableName = "reminders",
+    indices = [
+        Index("isCompleted"),
+        Index("triggerTime")
+    ]
+)
 data class Reminder(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

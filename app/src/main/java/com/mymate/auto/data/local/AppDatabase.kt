@@ -17,8 +17,8 @@ import com.mymate.auto.data.model.*
         Reminder::class,
         Memory::class
     ], 
-    version = 3, 
-    exportSchema = false
+    version = 4, 
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -97,6 +97,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v3 to v4 - add quickActionId to chat_messages + indexes
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add quickActionId column to chat_messages
+                database.execSQL("ALTER TABLE chat_messages ADD COLUMN quickActionId TEXT")
+                
+                // Add indexes for better query performance
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_memories_category ON memories(category)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_memories_updatedAt ON memories(updatedAt)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_reminders_isCompleted ON reminders(isCompleted)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_reminders_triggerTime ON reminders(triggerTime)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_parking_locations_isActive ON parking_locations(isActive)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_parking_locations_timestamp ON parking_locations(timestamp)")
+            }
+        }
+        
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -104,8 +120,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mymate_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    // No fallbackToDestructiveMigration - we handle all migrations explicitly
                     .build()
                 INSTANCE = instance
                 instance
@@ -116,17 +132,26 @@ abstract class AppDatabase : RoomDatabase() {
 
 /**
  * Type converters for Room
+ * Uses defensive parsing to handle corrupt/invalid data gracefully
  */
 class Converters {
     @androidx.room.TypeConverter
     fun fromRepeatType(value: RepeatType): String = value.name
     
     @androidx.room.TypeConverter
-    fun toRepeatType(value: String): RepeatType = RepeatType.valueOf(value)
+    fun toRepeatType(value: String): RepeatType = try {
+        RepeatType.valueOf(value)
+    } catch (e: Exception) {
+        RepeatType.NONE // Safe default
+    }
     
     @androidx.room.TypeConverter
     fun fromMemoryCategory(value: MemoryCategory): String = value.name
     
     @androidx.room.TypeConverter
-    fun toMemoryCategory(value: String): MemoryCategory = MemoryCategory.valueOf(value)
+    fun toMemoryCategory(value: String): MemoryCategory = try {
+        MemoryCategory.valueOf(value)
+    } catch (e: Exception) {
+        MemoryCategory.GENERAL // Safe default
+    }
 }

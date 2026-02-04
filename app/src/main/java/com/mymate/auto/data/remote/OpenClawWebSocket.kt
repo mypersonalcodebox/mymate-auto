@@ -12,8 +12,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import okhttp3.*
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.min
+import kotlin.random.Random
 
 /**
  * OpenClaw Gateway WebSocket Client
@@ -34,20 +38,27 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.30"
+        private const val CLIENT_VERSION = "2.37"
+        private const val MAX_RECONNECT_ATTEMPTS = 10
+        private const val BASE_RECONNECT_DELAY_MS = 1000L
+        private const val MAX_RECONNECT_DELAY_MS = 30000L
     }
     
     private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
     
+    @Volatile
     private var webSocket: WebSocket? = null
+    private val webSocketLock = Any()
     private val gson = Gson()
     private var reconnectJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val requestIdCounter = AtomicInteger(0)
-    private val pendingRequests = mutableMapOf<String, CompletableDeferred<JsonObject>>()
+    private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JsonObject>>()
+    private var reconnectAttempt = AtomicInteger(0)
     
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState
@@ -58,7 +69,8 @@ class OpenClawWebSocket(
     private val _agentEvents = MutableSharedFlow<AgentEvent>()
     val agentEvents: SharedFlow<AgentEvent> = _agentEvents
     
-    private var isConnected = false
+    private val isConnected = AtomicBoolean(false)
+    @Volatile
     private var sessionKey: String = "agent:main:main"
     
     enum class ConnectionState {
@@ -95,7 +107,8 @@ class OpenClawWebSocket(
         }
         
         _connectionState.value = ConnectionState.CONNECTING
-        isConnected = false
+        isConnected.set(false)
+        reconnectAttempt.set(0)
         
         var wsUrl = gatewayUrl.replace("http://", "ws://").replace("https://", "wss://")
         
@@ -136,24 +149,24 @@ class OpenClawWebSocket(
             
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "WebSocket closed: $code $reason")
-                isConnected = false
+                isConnected.set(false)
                 _connectionState.value = ConnectionState.DISCONNECTED
                 
-                if (autoReconnect) {
+                // Only reconnect for normal/going-away close codes, not policy violations
+                if (autoReconnect && code in listOf(1000, 1001, 1006)) {
                     scheduleReconnect()
                 }
             }
             
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket error: ${t.message}", t)
-                isConnected = false
+                isConnected.set(false)
                 _connectionState.value = ConnectionState.ERROR
                 
                 // Reject pending requests
-                pendingRequests.values.forEach { 
-                    it.completeExceptionally(t) 
-                }
+                val pending = pendingRequests.values.toList()
                 pendingRequests.clear()
+                pending.forEach { it.completeExceptionally(t) }
                 
                 if (autoReconnect) {
                     scheduleReconnect()
@@ -240,7 +253,8 @@ class OpenClawWebSocket(
                 val payloadType = payload?.get("type")?.asString
                 if (payloadType == "hello-ok") {
                     Log.d(TAG, "Connected successfully to OpenClaw Gateway")
-                    isConnected = true
+                    isConnected.set(true)
+                    reconnectAttempt.set(0)
                     _connectionState.value = ConnectionState.CONNECTED
                 }
             } else {
@@ -395,7 +409,7 @@ class OpenClawWebSocket(
      * Send a chat message to the agent
      */
     suspend fun sendChatMessage(message: String, sk: String = sessionKey): Result<String> {
-        if (!isConnected) {
+        if (!isConnected.get()) {
             return Result.failure(IllegalStateException("Not connected to Gateway"))
         }
         
@@ -460,7 +474,7 @@ class OpenClawWebSocket(
      * Get chat history
      */
     suspend fun getChatHistory(sk: String = sessionKey, limit: Int = 50): Result<List<Map<String, Any>>> {
-        if (!isConnected) {
+        if (!isConnected.get()) {
             return Result.failure(IllegalStateException("Not connected to Gateway"))
         }
         
@@ -502,7 +516,7 @@ class OpenClawWebSocket(
      * Check gateway health
      */
     suspend fun checkHealth(): Result<Boolean> {
-        if (!isConnected) {
+        if (!isConnected.get()) {
             return Result.failure(IllegalStateException("Not connected to Gateway"))
         }
         
@@ -535,18 +549,37 @@ class OpenClawWebSocket(
     
     fun disconnect() {
         reconnectJob?.cancel()
-        webSocket?.close(1000, "User disconnect")
-        webSocket = null
-        isConnected = false
+        synchronized(webSocketLock) {
+            webSocket?.close(1000, "User disconnect")
+            webSocket = null
+        }
+        isConnected.set(false)
+        reconnectAttempt.set(0)
         _connectionState.value = ConnectionState.DISCONNECTED
         pendingRequests.clear()
     }
     
     private fun scheduleReconnect() {
         reconnectJob?.cancel()
+        
+        val currentAttempt = reconnectAttempt.getAndIncrement()
+        if (currentAttempt >= MAX_RECONNECT_ATTEMPTS) {
+            Log.w(TAG, "Max reconnect attempts reached ($MAX_RECONNECT_ATTEMPTS)")
+            _connectionState.value = ConnectionState.ERROR
+            return
+        }
+        
+        // Exponential backoff with jitter
+        val delay = min(
+            MAX_RECONNECT_DELAY_MS,
+            BASE_RECONNECT_DELAY_MS * (1L shl currentAttempt)
+        ) + Random.nextLong(500)
+        
+        Log.d(TAG, "Scheduling reconnect attempt ${currentAttempt + 1}/$MAX_RECONNECT_ATTEMPTS in ${delay}ms")
+        
         reconnectJob = scope.launch {
             _connectionState.value = ConnectionState.RECONNECTING
-            delay(5000) // Wait 5 seconds before reconnecting
+            delay(delay)
             connect(autoReconnect = true)
         }
     }
