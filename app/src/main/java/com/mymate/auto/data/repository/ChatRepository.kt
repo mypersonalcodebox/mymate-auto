@@ -7,9 +7,11 @@ import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.model.QuickActions
+import com.mymate.auto.data.remote.MemorySyncManager
 import com.mymate.auto.data.remote.MyMateApiClient
 import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.service.TtsManager
+import com.mymate.auto.util.MemoryDetector
 import com.mymate.auto.util.TextUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +71,22 @@ class ChatRepository(
                 }
             }
             
+            // Listen for agent events including memory_sync
+            scope.launch {
+                agentEvents.collect { event ->
+                    when (event.type) {
+                        "memory_sync" -> {
+                            Log.d(TAG, "Memory sync event received")
+                            event.content?.let { payload ->
+                                context?.let { ctx ->
+                                    MemorySyncManager.getInstance(ctx).processMemorySync(payload)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Note: Chat responses are saved in sendViaWebSocket, not here
             // to avoid duplicate messages
             
@@ -114,6 +132,9 @@ class ChatRepository(
         quickActionId?.let {
             preferencesManager.incrementActionUsage(it)
         }
+        
+        // Auto-detect and save memories from user message
+        autoSaveMemoryIfDetected(message)
         
         // Try WebSocket first if enabled and connected
         val useWebSocket = preferencesManager.getUseOpenClawWebSocketSync()
@@ -236,6 +257,29 @@ class ChatRepository(
             compareByDescending<QuickAction> { it.usageCount }
                 .thenByDescending { it.lastUsed }
         )
+    }
+    
+    /**
+     * Automatically detect and save memory-worthy content from messages
+     */
+    private suspend fun autoSaveMemoryIfDetected(message: String) {
+        try {
+            val detection = MemoryDetector.detectMemory(message)
+            if (detection != null && detection.confidence >= 0.7f) {
+                Log.d(TAG, "Memory detected: ${detection.content.take(50)} (${detection.category}, confidence: ${detection.confidence})")
+                
+                context?.let { ctx ->
+                    MemorySyncManager.getInstance(ctx).createMemory(
+                        content = detection.content,
+                        category = detection.category,
+                        source = "voice"
+                    )
+                    Log.d(TAG, "Memory auto-saved!")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error auto-saving memory: ${e.message}")
+        }
     }
     
     fun cleanup() {

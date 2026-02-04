@@ -34,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.29"
+        private const val CLIENT_VERSION = "2.30"
     }
     
     private val client = OkHttpClient.Builder()
@@ -369,6 +369,21 @@ class OpenClawWebSocket(
             "presence" -> {
                 // Presence update
                 Log.d(TAG, "Presence update received")
+            }
+            "memory_sync" -> {
+                // Memory sync from gateway - save to local database
+                Log.d(TAG, "Memory sync received")
+                payload?.let { p ->
+                    scope.launch {
+                        _agentEvents.emit(AgentEvent(
+                            type = "memory_sync",
+                            sessionKey = null,
+                            content = p.toString(),
+                            status = "sync",
+                            data = p
+                        ))
+                    }
+                }
             }
             else -> {
                 Log.d(TAG, "Unknown event: $event")
