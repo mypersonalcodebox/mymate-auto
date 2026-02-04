@@ -32,8 +32,8 @@ class OpenClawWebSocket(
     companion object {
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
-        private const val CLIENT_ID = "mymate-android-auto"
-        private const val CLIENT_VERSION = "2.17"
+        private const val CLIENT_ID = "openclaw-android"
+        private const val CLIENT_VERSION = "2.18"
     }
     
     private val client = OkHttpClient.Builder()
