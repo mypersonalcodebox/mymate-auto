@@ -34,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.26"
+        private const val CLIENT_VERSION = "2.27"
     }
     
     private val client = OkHttpClient.Builder()
@@ -74,7 +74,8 @@ class OpenClawWebSocket(
         val sessionKey: String,
         val content: String,
         val isComplete: Boolean,
-        val error: String? = null
+        val error: String? = null,
+        val runId: String? = null
     )
     
     data class AgentEvent(
@@ -320,8 +321,9 @@ class OpenClawWebSocket(
                 }
             }
             "chat" -> {
-                // Chat message event - OpenClaw sends: { state, message: { content: [{ text }] } }
+                // Chat message event - OpenClaw sends: { runId, state, message: { content: [{ text }] } }
                 val sk = payload?.get("sessionKey")?.asString ?: sessionKey
+                val runId = payload?.get("runId")?.asString
                 val state = payload?.get("state")?.asString ?: "final"
                 val isComplete = state == "final"
                 val isError = state == "error"
@@ -341,23 +343,25 @@ class OpenClawWebSocket(
                 
                 // Only emit final responses (skip deltas to avoid duplicates)
                 if (isComplete && content.isNotEmpty()) {
-                    Log.d(TAG, "Chat response received: ${content.take(50)}...")
+                    Log.d(TAG, "Chat response received [runId=$runId]: ${content.take(50)}...")
                     scope.launch {
                         _chatResponses.emit(ChatResponse(
                             sessionKey = sk,
                             content = content,
                             isComplete = true,
-                            error = errorMsg
+                            error = errorMsg,
+                            runId = runId
                         ))
                     }
                 } else if (isError) {
-                    Log.e(TAG, "Chat error: $errorMsg")
+                    Log.e(TAG, "Chat error [runId=$runId]: $errorMsg")
                     scope.launch {
                         _chatResponses.emit(ChatResponse(
                             sessionKey = sk,
                             content = "",
                             isComplete = true,
-                            error = errorMsg ?: "Unknown error"
+                            error = errorMsg ?: "Unknown error",
+                            runId = runId
                         ))
                     }
                 }
@@ -383,34 +387,6 @@ class OpenClawWebSocket(
         val requestId = "chat-${requestIdCounter.incrementAndGet()}"
         val idempotencyKey = UUID.randomUUID().toString()
         
-        // Create a deferred for the final response - start listening BEFORE sending
-        val responseDeferred = CompletableDeferred<String>()
-        
-        // Start collecting chat responses in background BEFORE sending
-        val collectorJob = scope.launch {
-            try {
-                withTimeout(120_000) {
-                    chatResponses.first { response ->
-                        Log.d(TAG, "Checking response: sk=${response.sessionKey}, complete=${response.isComplete}, content=${response.content.take(30)}")
-                        if ((response.sessionKey == sk || response.sessionKey == sessionKey) && response.isComplete) {
-                            if (response.error != null) {
-                                responseDeferred.completeExceptionally(RuntimeException(response.error))
-                            } else {
-                                responseDeferred.complete(response.content)
-                            }
-                            true // Stop collecting
-                        } else {
-                            false // Keep collecting
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                if (!responseDeferred.isCompleted) {
-                    responseDeferred.completeExceptionally(e)
-                }
-            }
-        }
-        
         val request = buildJsonObject {
             put("type", "req")
             put("id", requestId)
@@ -429,23 +405,36 @@ class OpenClawWebSocket(
         Log.d(TAG, "Sending chat.send: $json")
         
         return try {
-            webSocket?.send(json) ?: run {
-                collectorJob.cancel()
-                return Result.failure(IllegalStateException("WebSocket is null"))
-            }
+            webSocket?.send(json) ?: return Result.failure(IllegalStateException("WebSocket is null"))
             
-            // Wait for acknowledgment (quick response)
-            withTimeout(30_000) {
+            // Wait for acknowledgment to get the runId
+            val ackPayload = withTimeout(30_000) {
                 ackDeferred.await()
             }
-            Log.d(TAG, "Got acknowledgment, waiting for response...")
             
-            // Wait for the actual chat response
-            val response = responseDeferred.await()
-            Log.d(TAG, "Received response: ${response.take(100)}...")
-            Result.success(response)
+            // Extract runId from acknowledgment
+            val runId = ackPayload.get("runId")?.asString
+            Log.d(TAG, "Got acknowledgment with runId=$runId, waiting for response...")
+            
+            if (runId == null) {
+                return Result.failure(IllegalStateException("No runId in acknowledgment"))
+            }
+            
+            // Now wait for the chat response matching this runId
+            withTimeout(120_000) {
+                val response = chatResponses.first { response ->
+                    Log.d(TAG, "Checking response: runId=${response.runId} vs $runId, complete=${response.isComplete}")
+                    response.runId == runId && response.isComplete
+                }
+                
+                if (response.error != null) {
+                    Result.failure<String>(RuntimeException(response.error))
+                } else {
+                    Log.d(TAG, "Received response for runId=$runId: ${response.content.take(100)}...")
+                    Result.success(response.content)
+                }
+            }
         } catch (e: Exception) {
-            collectorJob.cancel()
             pendingRequests.remove(requestId)
             Log.e(TAG, "sendChatMessage failed: ${e.message}", e)
             Result.failure(e)
