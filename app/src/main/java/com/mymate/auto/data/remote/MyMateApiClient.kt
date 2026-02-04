@@ -16,6 +16,11 @@ import kotlin.coroutines.resumeWithException
 
 class MyMateApiClient {
     
+    companion object {
+        // Default token for OpenClaw Gateway authentication
+        private const val DEFAULT_AUTH_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
+    }
+    
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -23,6 +28,12 @@ class MyMateApiClient {
         .build()
     
     private val gson = Gson()
+    
+    private var authToken: String = DEFAULT_AUTH_TOKEN
+    
+    fun setAuthToken(token: String) {
+        authToken = token
+    }
     
     suspend fun sendMessage(
         webhookUrl: String,
@@ -44,6 +55,7 @@ class MyMateApiClient {
                 .post(body)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("X-Source", "MyMate-Android-Auto")
+                .addHeader("Authorization", "Bearer $authToken")
                 .build()
             
             val response = suspendCancellableCoroutine<Response> { continuation ->
@@ -99,6 +111,7 @@ class MyMateApiClient {
                 if (it == webhookUrl) "$webhookUrl/health" else it 
             })
             .head()
+            .addHeader("Authorization", "Bearer $authToken")
             .build()
         
         client.newCall(request).enqueue(object : Callback {
