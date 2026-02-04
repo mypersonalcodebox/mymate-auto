@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
+    <!-- Enable Car App Library template support -->
     <uses name="template"/>
+    
+    <!-- POI category for parking location features -->
+    <uses name="parking"/>
 </automotiveApp>

@@ -12,8 +12,8 @@ android {
         applicationId = "com.mymate.auto"
         minSdk = 26
         targetSdk = 35
-        versionCode = 30
-        versionName = "2.30"
+        versionCode = 31
+        versionName = "2.31"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -78,8 +78,9 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
     
-    // Android Auto
-    implementation("androidx.car.app:app:1.4.0")
+    // Android Auto - use 1.7.0 with app-projected for Android Auto
+    implementation("androidx.car.app:app:1.7.0")
+    implementation("androidx.car.app:app-projected:1.7.0")
     
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")

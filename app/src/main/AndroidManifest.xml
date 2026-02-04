@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Package visibility for Android Auto -->
+    <queries>
+        <package android:name="com.google.android.projection.gearhead"/>
+    </queries>
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -30,7 +35,7 @@
         
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="1"/>
+            android:value="3"/>
             
         <!-- Android Auto Service -->
         <service
@@ -38,10 +43,8 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService"/>
+                <category android:name="androidx.car.app.category.POI"/>
             </intent-filter>
-            <meta-data
-                android:name="androidx.car.app.CarAppService.category"
-                android:value="androidx.car.app.category.IOT"/>
         </service>
         
         <!-- Background Service -->
