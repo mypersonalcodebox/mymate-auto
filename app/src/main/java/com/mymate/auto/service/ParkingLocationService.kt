@@ -55,10 +55,14 @@ class ParkingLocationService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "ParkingLocationService created")
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        database = AppDatabase.getInstance(this)
-        preferencesManager = PreferencesManager(this)
-        createNotificationChannel()
+        try {
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+            database = AppDatabase.getInstance(this)
+            preferencesManager = PreferencesManager(this)
+            createNotificationChannel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing ParkingLocationService: ${e.message}", e)
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -82,59 +86,91 @@ class ParkingLocationService : Service() {
     
     @SuppressLint("MissingPermission")
     private fun saveCurrentLocation() {
-        if (!hasLocationPermission()) {
-            Log.w(TAG, "No location permission")
-            showNotification("Geen locatie permissie", "Kan parkeerlocatie niet opslaan")
-            stopSelf()
-            return
-        }
-        
-        // Request high accuracy location
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
-            .setWaitForAccurateLocation(true)
-            .setMinUpdateIntervalMillis(500)
-            .setMaxUpdates(3) // Try up to 3 times
-            .build()
-        
-        val locationCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                val location = result.lastLocation
-                if (location != null && location.accuracy <= MIN_ACCURACY_METERS) {
-                    Log.d(TAG, "Got accurate location: ${location.latitude}, ${location.longitude} (accuracy: ${location.accuracy}m)")
-                    fusedLocationClient.removeLocationUpdates(this)
-                    processLocation(location)
-                } else if (location != null) {
-                    Log.d(TAG, "Location not accurate enough: ${location.accuracy}m (need <${MIN_ACCURACY_METERS}m)")
-                }
-            }
-        }
-        
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.getMainLooper()
-        )
-        
-        // Timeout after 15 seconds
-        scope.launch {
-            delay(15000)
-            fusedLocationClient.removeLocationUpdates(locationCallback)
-            
-            // Try last known location as fallback
-            try {
-                val lastLocation = fusedLocationClient.lastLocation.await()
-                if (lastLocation != null) {
-                    Log.d(TAG, "Using last known location as fallback")
-                    processLocation(lastLocation)
-                } else {
-                    showNotification("Locatie niet gevonden", "Kon geen GPS signaal krijgen")
-                    stopSelf()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error getting last location: ${e.message}")
-                showNotification("Locatie fout", e.message ?: "Onbekende fout")
+        try {
+            if (!hasLocationPermission()) {
+                Log.w(TAG, "No location permission")
+                showNotification("Geen locatie permissie", "Kan parkeerlocatie niet opslaan")
                 stopSelf()
+                return
             }
+            
+            if (!::fusedLocationClient.isInitialized) {
+                Log.e(TAG, "FusedLocationClient not initialized")
+                showNotification("Locatie service fout", "Herstart de app")
+                stopSelf()
+                return
+            }
+            
+            // Request high accuracy location
+            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
+                .setWaitForAccurateLocation(true)
+                .setMinUpdateIntervalMillis(500)
+                .setMaxUpdates(3) // Try up to 3 times
+                .build()
+            
+            var locationProcessed = false
+            
+            val locationCallback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    if (locationProcessed) return
+                    
+                    val location = result.lastLocation
+                    if (location != null && location.accuracy <= MIN_ACCURACY_METERS) {
+                        locationProcessed = true
+                        Log.d(TAG, "Got accurate location: ${location.latitude}, ${location.longitude} (accuracy: ${location.accuracy}m)")
+                        try {
+                            fusedLocationClient.removeLocationUpdates(this)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error removing location updates: ${e.message}")
+                        }
+                        processLocation(location)
+                    } else if (location != null) {
+                        Log.d(TAG, "Location not accurate enough: ${location.accuracy}m (need <${MIN_ACCURACY_METERS}m)")
+                    }
+                }
+            }
+            
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+            
+            // Timeout after 15 seconds
+            scope.launch {
+                delay(15000)
+                
+                if (locationProcessed) return@launch
+                
+                try {
+                    fusedLocationClient.removeLocationUpdates(locationCallback)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error removing location callback: ${e.message}")
+                }
+                
+                // Try last known location as fallback
+                try {
+                    val lastLocation = fusedLocationClient.lastLocation.await()
+                    if (lastLocation != null && !locationProcessed) {
+                        locationProcessed = true
+                        Log.d(TAG, "Using last known location as fallback")
+                        processLocation(lastLocation)
+                    } else if (!locationProcessed) {
+                        showNotification("Locatie niet gevonden", "Kon geen GPS signaal krijgen")
+                        stopSelf()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error getting last location: ${e.message}", e)
+                    if (!locationProcessed) {
+                        showNotification("Locatie fout", e.message ?: "Onbekende fout")
+                        stopSelf()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in saveCurrentLocation: ${e.message}", e)
+            showNotification("Opslaan mislukt", e.message ?: "Onbekende fout")
+            stopSelf()
         }
     }
     
@@ -297,11 +333,14 @@ class ParkingLocationService : Service() {
         scope.cancel()
     }
     
-    // Extension to await location
+    // Extension to await location - use Google Tasks API
+    @Suppress("BlockingMethodInNonBlockingContext")
     private suspend fun com.google.android.gms.tasks.Task<Location>.await(): Location? {
-        return suspendCancellableCoroutine { cont ->
-            addOnSuccessListener { cont.resume(it) {} }
-            addOnFailureListener { cont.resume(null) {} }
+        return try {
+            com.google.android.gms.tasks.Tasks.await(this)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error awaiting location task: ${e.message}")
+            null
         }
     }
 }
