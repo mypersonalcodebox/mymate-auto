@@ -12,8 +12,8 @@ android {
         applicationId = "com.mymate.auto"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "2.33"
+        versionCode = 34
+        versionName = "2.34"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
