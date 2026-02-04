@@ -14,10 +14,10 @@ interface ReminderDao {
     suspend fun getPendingReminders(): List<Reminder>
     
     @Query("SELECT * FROM reminders ORDER BY triggerTime DESC")
-    fun getAllRemindersFlow(): Flow<List<Reminder>>
+    fun getAllReminders(): Flow<List<Reminder>>
     
     @Query("SELECT * FROM reminders ORDER BY triggerTime DESC")
-    suspend fun getAllReminders(): List<Reminder>
+    suspend fun getAllRemindersSync(): List<Reminder>
     
     @Query("SELECT * FROM reminders WHERE isCompleted = 0 AND triggerTime <= :time ORDER BY triggerTime ASC")
     suspend fun getDueReminders(time: Long = System.currentTimeMillis()): List<Reminder>

@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
 interface MemoryDao {
     
     @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
-    fun getAllMemoriesFlow(): Flow<List<Memory>>
+    fun getAllMemories(): Flow<List<Memory>>
     
     @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
-    suspend fun getAllMemories(): List<Memory>
+    suspend fun getAllMemoriesSync(): List<Memory>
     
     @Query("SELECT * FROM memories WHERE category = :category ORDER BY updatedAt DESC")
     fun getByCategory(category: MemoryCategory): Flow<List<Memory>>

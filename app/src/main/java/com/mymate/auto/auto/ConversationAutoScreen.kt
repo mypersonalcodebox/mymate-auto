@@ -11,18 +11,27 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.gson.Gson
 import com.mymate.auto.data.model.ConversationMessage
-import com.mymate.auto.data.remote.OpenClawWebSocket
-import kotlinx.coroutines.*
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
     
     private val TAG = "ConversationAutoScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val gson = Gson()
+    
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
     
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -38,8 +47,6 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private val ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
     
-    private var webSocket: OpenClawWebSocket? = null
-    private val isConnected = AtomicBoolean(false)
     private val isLoading = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
     
@@ -47,7 +54,7 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private var messages: MutableList<ConversationMessage> = mutableListOf()
     
     @Volatile
-    private var connectionStatus = "Verbinden..."
+    private var connectionStatus = "Gereed"
     
     @Volatile
     private var lastResponse: String? = null
@@ -67,8 +74,6 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
                 cleanup()
             }
         })
-        
-        connectWebSocket()
     }
     
     override fun onInit(status: Int) {
@@ -83,99 +88,19 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         }
     }
     
-    private fun connectWebSocket() {
-        scope.launch {
-            try {
-                val wsUrl = "ws://$gatewayHost:$gatewayPort/ws"
-                Log.d(TAG, "Connecting to WebSocket: $wsUrl")
-                
-                webSocket = OpenClawWebSocket(
-                    url = wsUrl,
-                    authToken = authToken,
-                    onConnected = {
-                        Log.d(TAG, "WebSocket connected")
-                        isConnected.set(true)
-                        connectionStatus = "Verbonden ✅"
-                        mainHandler.post { safeInvalidate() }
-                    },
-                    onDisconnected = { reason ->
-                        Log.d(TAG, "WebSocket disconnected: $reason")
-                        isConnected.set(false)
-                        connectionStatus = "Niet verbonden ❌"
-                        mainHandler.post { safeInvalidate() }
-                    },
-                    onMessage = { response ->
-                        handleWebSocketResponse(response)
-                    },
-                    onError = { error ->
-                        Log.e(TAG, "WebSocket error: $error")
-                        connectionStatus = "Fout: $error"
-                        mainHandler.post { safeInvalidate() }
-                    }
-                )
-                
-                webSocket?.connect()
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to connect WebSocket", e)
-                connectionStatus = "Verbinding mislukt"
-                mainHandler.post { safeInvalidate() }
-            }
-        }
-    }
-    
-    private fun handleWebSocketResponse(response: String) {
-        mainHandler.post {
-            if (isDestroyed.get()) return@post
-            
-            try {
-                val responseMap = gson.fromJson(response, Map::class.java)
-                val reply = responseMap["reply"]?.toString() 
-                    ?: responseMap["message"]?.toString()
-                    ?: responseMap["text"]?.toString()
-                
-                if (reply != null) {
-                    lastResponse = reply
-                    isLoading.set(false)
-                    
-                    // Add to messages
-                    messages.add(ConversationMessage(
-                        id = System.currentTimeMillis(),
-                        content = reply,
-                        isFromUser = false,
-                        timestamp = System.currentTimeMillis(),
-                        topic = "chat"
-                    ))
-                    
-                    // Speak if TTS enabled
-                    if (ttsEnabled && ttsReady && tts != null) {
-                        try {
-                            tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "response")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "TTS error", e)
-                        }
-                    }
-                    
-                    safeInvalidate()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing response", e)
-            }
-        }
-    }
-    
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // Connection status & new message button
+        // New message button
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🎤 Nieuw bericht")
-                .addText(connectionStatus)
+                .addText(if (isLoading.get()) "Even denken..." else connectionStatus)
                 .setOnClickListener {
-                    if (isConnected.get()) {
+                    if (!isLoading.get()) {
                         screenManager.push(
-                            VoiceInputScreen(carContext, "conversation") { message ->
-                                sendMessage(message)
+                            VoiceInputScreen(carContext, "conversation") { text ->
+                                sendMessage(text)
                             }
                         )
                     }
@@ -239,34 +164,19 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
             )
         }
         
-        // Reconnect button if disconnected
-        if (!isConnected.get()) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("🔄 Opnieuw verbinden")
-                    .setOnClickListener {
-                        connectionStatus = "Verbinden..."
-                        invalidate()
-                        connectWebSocket()
-                    }
-                    .build()
-            )
-        }
-        
         return ListTemplate.Builder()
             .setTitle("💬 Gesprek")
             .setHeaderAction(Action.BACK)
             .setSingleList(listBuilder.build())
+            .setLoading(isLoading.get())
             .build()
     }
     
     private fun sendMessage(message: String) {
-        if (!isConnected.get()) {
-            Log.w(TAG, "Not connected, can't send message")
+        if (!isLoading.compareAndSet(false, true)) {
+            Log.w(TAG, "Already loading, ignoring request")
             return
         }
-        
-        isLoading.set(true)
         
         // Add user message
         messages.add(ConversationMessage(
@@ -277,18 +187,93 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
             topic = "chat"
         ))
         
+        connectionStatus = "Versturen..."
         safeInvalidate()
         
-        scope.launch {
-            try {
-                webSocket?.sendMessage(message, sessionKey)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send message", e)
-                mainHandler.post {
-                    isLoading.set(false)
-                    safeInvalidate()
+        // Build conversation context (last 10 messages)
+        val contextMessages = messages.takeLast(10).map { msg ->
+            mapOf(
+                "role" to if (msg.isFromUser) "user" else "assistant",
+                "content" to msg.content
+            )
+        }
+        
+        val requestBody = mapOf(
+            "message" to message,
+            "sessionKey" to sessionKey,
+            "context" to contextMessages,
+            "source" to "android_auto_conversation"
+        )
+        
+        val json = gson.toJson(requestBody)
+        val body = json.toRequestBody("application/json".toMediaType())
+        
+        val url = "http://$gatewayHost:18791/auto"
+        
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Authorization", "Bearer $authToken")
+            .build()
+        
+        Log.d(TAG, "Sending conversation message: $message")
+        
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e(TAG, "Request failed", e)
+                handleResponse("❌ Verbindingsfout: ${e.localizedMessage ?: "Onbekende fout"}")
+            }
+            
+            override fun onResponse(call: Call, response: Response) {
+                Log.d(TAG, "Got response: ${response.code}")
+                
+                val responseText = try {
+                    response.body?.use { body ->
+                        val responseBody = body.string()
+                        val result = gson.fromJson(responseBody, Map::class.java)
+                        result["reply"]?.toString() 
+                            ?: result["message"]?.toString()
+                            ?: result["text"]?.toString()
+                            ?: "Geen antwoord"
+                    } ?: "Leeg antwoord"
+                } catch (e: Exception) {
+                    Log.e(TAG, "Parse error", e)
+                    "Fout bij verwerken antwoord"
+                }
+                
+                handleResponse(responseText)
+            }
+        })
+    }
+    
+    private fun handleResponse(responseText: String) {
+        mainHandler.post {
+            if (isDestroyed.get()) return@post
+            
+            lastResponse = responseText
+            isLoading.set(false)
+            connectionStatus = "Gereed"
+            
+            // Add assistant message
+            messages.add(ConversationMessage(
+                id = System.currentTimeMillis(),
+                content = responseText,
+                isFromUser = false,
+                timestamp = System.currentTimeMillis(),
+                topic = "chat"
+            ))
+            
+            // Speak if TTS enabled
+            if (ttsEnabled && ttsReady && tts != null) {
+                try {
+                    tts?.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "response")
+                } catch (e: Exception) {
+                    Log.e(TAG, "TTS error", e)
                 }
             }
+            
+            safeInvalidate()
         }
     }
     
@@ -308,13 +293,6 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun cleanup() {
         isDestroyed.set(true)
-        scope.cancel()
-        
-        try {
-            webSocket?.disconnect()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error disconnecting WebSocket", e)
-        }
         
         try {
             tts?.stop()
@@ -323,10 +301,5 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
             Log.e(TAG, "Error shutting down TTS", e)
         }
         tts = null
-    }
-    
-    override fun onDestroy(owner: LifecycleOwner) {
-        cleanup()
-        super.onDestroy(owner)
     }
 }

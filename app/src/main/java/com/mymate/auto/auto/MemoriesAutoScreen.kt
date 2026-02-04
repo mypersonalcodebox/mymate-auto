@@ -15,7 +15,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "MemoriesAutoScreen"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val db = AppDatabase.getDatabase(carContext)
+    private val db = AppDatabase.getInstance(carContext)
     private val memoryDao = db.memoryDao()
     private val dateFormat = SimpleDateFormat("dd MMM", Locale("nl", "NL"))
     
@@ -41,7 +41,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 memories = if (selectedCategory != null) {
                     memoryDao.getMemoriesByCategory(selectedCategory!!)
                 } else {
-                    memoryDao.getAllMemories()
+                    memoryDao.getAllMemoriesSync()
                 }
                 categories = memoryDao.getAllCategories()
                 isLoading = false
@@ -74,8 +74,8 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("🎤 Nieuwe memory toevoegen")
                 .setOnClickListener {
                     screenManager.push(
-                        VoiceInputScreen(carContext, "add_memory") { message ->
-                            addMemory(message)
+                        VoiceInputScreen(carContext, "add_memory") { text ->
+                            addMemory(text)
                         }
                     )
                 }
@@ -196,11 +196,6 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
             MemoryCategory.CONTACT -> "👤"
             MemoryCategory.TODO -> "✅"
         }
-    }
-    
-    override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
-        scope.cancel()
-        super.onDestroy(owner)
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import com.mymate.auto.data.local.AppDatabase
 import com.mymate.auto.data.model.Reminder
+import com.mymate.auto.data.model.RepeatType
 import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -14,7 +15,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "RemindersAutoScreen"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val db = AppDatabase.getDatabase(carContext)
+    private val db = AppDatabase.getInstance(carContext)
     private val reminderDao = db.reminderDao()
     private val dateFormat = SimpleDateFormat("EEE d MMM HH:mm", Locale("nl", "NL"))
     private val timeFormat = SimpleDateFormat("HH:mm", Locale("nl", "NL"))
@@ -36,7 +37,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
         scope.launch {
             try {
                 reminders = if (showCompleted) {
-                    reminderDao.getAllReminders()
+                    reminderDao.getAllRemindersSync()
                 } else {
                     reminderDao.getPendingReminders()
                 }
@@ -71,8 +72,8 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_5min") { message ->
-                            addReminder(message, 5)
+                        VoiceInputScreen(carContext, "reminder_5min") { text ->
+                            addReminder(text, 5)
                         }
                     )
                 }
@@ -85,8 +86,8 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_15min") { message ->
-                            addReminder(message, 15)
+                        VoiceInputScreen(carContext, "reminder_15min") { text ->
+                            addReminder(text, 15)
                         }
                     )
                 }
@@ -99,8 +100,8 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_1hr") { message ->
-                            addReminder(message, 60)
+                        VoiceInputScreen(carContext, "reminder_1hr") { text ->
+                            addReminder(text, 60)
                         }
                     )
                 }
@@ -113,9 +114,8 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_custom") { message ->
-                            // Parse time from message or use AI
-                            addReminderWithParsing(message)
+                        VoiceInputScreen(carContext, "reminder_custom") { text ->
+                            addReminderWithParsing(text)
                         }
                     )
                 }
@@ -150,7 +150,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 
                 listBuilder.addItem(
                     Row.Builder()
-                        .setTitle("$statusEmoji ${reminder.message.take(40)}")
+                        .setTitle("$statusEmoji ${reminder.title.take(40)}")
                         .addText(timeText)
                         .setOnClickListener {
                             screenManager.push(ReminderDetailScreen(carContext, reminder, reminderDao, scope) {
@@ -178,16 +178,18 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
     
-    private fun addReminder(message: String, minutesFromNow: Int) {
+    private fun addReminder(title: String, minutesFromNow: Int) {
         scope.launch {
             try {
                 val triggerTime = System.currentTimeMillis() + (minutesFromNow * 60 * 1000L)
                 
                 val reminder = Reminder(
-                    message = message,
+                    title = title,
+                    description = null,
                     triggerTime = triggerTime,
                     createdAt = System.currentTimeMillis(),
-                    isCompleted = false
+                    isCompleted = false,
+                    repeatType = RepeatType.NONE
                 )
                 
                 reminderDao.insertReminder(reminder)
@@ -202,7 +204,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "✅ Herinnering ingesteld!", "Je wordt over $timeText herinnerd aan:\n\n\"$message\"") {
+                        MessageScreen(carContext, "✅ Herinnering ingesteld!", "Je wordt over $timeText herinnerd aan:\n\n\"$title\"") {
                             screenManager.popToRoot()
                             screenManager.push(RemindersAutoScreen(carContext))
                         }
@@ -214,9 +216,9 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
     
-    private fun addReminderWithParsing(message: String) {
+    private fun addReminderWithParsing(text: String) {
         // Try to parse time from message
-        val lower = message.lowercase()
+        val lower = text.lowercase()
         
         val minutesFromNow = when {
             lower.contains("5 min") -> 5
@@ -230,7 +232,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
         }
         
         // Remove time indicators from message
-        val cleanMessage = message
+        val cleanTitle = text
             .replace(Regex("over \\d+ min(uten)?", RegexOption.IGNORE_CASE), "")
             .replace(Regex("over \\d+ uur", RegexOption.IGNORE_CASE), "")
             .replace("morgen", "", ignoreCase = true)
@@ -238,7 +240,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
             .replace("herinner me", "", ignoreCase = true)
             .trim()
         
-        addReminder(cleanMessage.ifEmpty { message }, minutesFromNow)
+        addReminder(cleanTitle.ifEmpty { text }, minutesFromNow)
     }
     
     private fun formatReminderTime(timestamp: Long): String {
@@ -253,11 +255,6 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
             diff < 48 * 60 * 60 * 1000 -> "Morgen om ${timeFormat.format(Date(timestamp))}"
             else -> dateFormat.format(Date(timestamp))
         }
-    }
-    
-    override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
-        scope.cancel()
-        super.onDestroy(owner)
     }
 }
 
@@ -277,13 +274,23 @@ class ReminderDetailScreen(
         
         val paneBuilder = Pane.Builder()
         
-        // Message
+        // Title
         paneBuilder.addRow(
             Row.Builder()
                 .setTitle("📝 Herinnering")
-                .addText(reminder.message)
+                .addText(reminder.title)
                 .build()
         )
+        
+        // Description if any
+        reminder.description?.let { desc ->
+            paneBuilder.addRow(
+                Row.Builder()
+                    .setTitle("📋 Details")
+                    .addText(desc)
+                    .build()
+            )
+        }
         
         // Time
         paneBuilder.addRow(

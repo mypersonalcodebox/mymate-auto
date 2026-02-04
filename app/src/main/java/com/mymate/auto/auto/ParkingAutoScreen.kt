@@ -25,7 +25,7 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "ParkingAutoScreen"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val db = AppDatabase.getDatabase(carContext)
+    private val db = AppDatabase.getInstance(carContext)
     private val parkingDao = db.parkingDao()
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(carContext)
     private val dateFormat = SimpleDateFormat("dd MMM HH:mm", Locale("nl", "NL"))
@@ -171,6 +171,7 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                     val parkingLocation = ParkingLocation(
                         latitude = location.latitude,
                         longitude = location.longitude,
+                        accuracy = location.accuracy,
                         address = address,
                         timestamp = System.currentTimeMillis(),
                         note = null
@@ -183,9 +184,11 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                         isSaving = false
                         statusMessage = "✅ Locatie opgeslagen!"
                         invalidate()
-                        
-                        // Clear status after 3 seconds
-                        delay(3000)
+                    }
+                    
+                    // Clear status after 3 seconds
+                    delay(3000)
+                    withContext(Dispatchers.Main) {
                         statusMessage = null
                         invalidate()
                     }
@@ -226,11 +229,6 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
             days < 7 -> "$days dagen geleden"
             else -> dateFormat.format(Date(timestamp))
         }
-    }
-    
-    override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
-        scope.cancel()
-        super.onDestroy(owner)
     }
 }
 

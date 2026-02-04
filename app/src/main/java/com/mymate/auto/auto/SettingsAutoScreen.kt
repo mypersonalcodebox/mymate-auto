@@ -80,10 +80,11 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         )
         
         // Webhook URL
+        val webhookDisplay = if (webhookUrl.length > 40) webhookUrl.take(40) + "..." else webhookUrl
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🔗 Webhook URL")
-                .addText(webhookUrl.take(40) + if (webhookUrl.length > 40) "..." else "")
+                .addText(webhookDisplay)
                 .setOnClickListener {
                     screenManager.push(
                         MessageScreen(carContext, 
@@ -121,7 +122,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         
         // App version
         val version = try {
-            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName
+            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName ?: "Onbekend"
         } catch (e: Exception) {
             "Onbekend"
         }
@@ -193,33 +194,33 @@ class ConnectionTestScreen(
     }
     
     override fun onGetTemplate(): Template {
-        return MessageTemplate.Builder(testStatus)
+        val builder = MessageTemplate.Builder(testStatus)
             .setTitle("🧪 Verbindingstest")
             .setHeaderAction(Action.BACK)
-            .apply {
-                if (testComplete) {
-                    addAction(
-                        Action.Builder()
-                            .setTitle("OK")
-                            .setOnClickListener {
-                                screenManager.pop()
-                            }
-                            .build()
-                    )
-                    
-                    addAction(
-                        Action.Builder()
-                            .setTitle("🔄 Opnieuw")
-                            .setOnClickListener {
-                                testStatus = "Testen..."
-                                testComplete = false
-                                invalidate()
-                                testConnection()
-                            }
-                            .build()
-                    )
-                }
-            }
-            .build()
+        
+        if (testComplete) {
+            builder.addAction(
+                Action.Builder()
+                    .setTitle("OK")
+                    .setOnClickListener {
+                        screenManager.pop()
+                    }
+                    .build()
+            )
+            
+            builder.addAction(
+                Action.Builder()
+                    .setTitle("🔄 Opnieuw")
+                    .setOnClickListener {
+                        testStatus = "Testen..."
+                        testComplete = false
+                        invalidate()
+                        testConnection()
+                    }
+                    .build()
+            )
+        }
+        
+        return builder.build()
     }
 }
