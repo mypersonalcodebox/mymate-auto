@@ -33,7 +33,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "mymate-android-auto"
-        private const val CLIENT_VERSION = "2.15"
+        private const val CLIENT_VERSION = "2.16"
     }
     
     private val client = OkHttpClient.Builder()
@@ -95,10 +95,22 @@ class OpenClawWebSocket(
         _connectionState.value = ConnectionState.CONNECTING
         isConnected = false
         
-        val wsUrl = gatewayUrl.replace("http://", "ws://").replace("https://", "wss://")
-        val request = Request.Builder()
-            .url(wsUrl)
-            .build()
+        var wsUrl = gatewayUrl.replace("http://", "ws://").replace("https://", "wss://")
+        
+        // Add token as URL parameter for auth
+        if (authToken != null) {
+            val separator = if (wsUrl.contains("?")) "&" else "?"
+            wsUrl = "$wsUrl${separator}token=$authToken"
+        }
+        
+        val requestBuilder = Request.Builder().url(wsUrl)
+        
+        // Also add as Authorization header
+        if (authToken != null) {
+            requestBuilder.addHeader("Authorization", "Bearer $authToken")
+        }
+        
+        val request = requestBuilder.build()
         
         Log.d(TAG, "Connecting to OpenClaw Gateway: $wsUrl")
         
