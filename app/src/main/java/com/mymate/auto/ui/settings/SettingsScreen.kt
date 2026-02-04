@@ -114,6 +114,17 @@ fun SettingsScreen(
                         showSessionKeyDialog = true
                     }
                 )
+                
+                // Test Connection Button
+                SettingsItem(
+                    icon = Icons.Default.NetworkCheck,
+                    title = "Test Verbinding",
+                    subtitle = "Controleer of gateway bereikbaar is",
+                    onClick = {
+                        viewModel.testConnection()
+                        showConnectionTestDialog = true
+                    }
+                )
             }
             
             Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -391,6 +402,20 @@ fun SettingsScreen(
                 TextButton(onClick = { showSessionKeyDialog = false }) {
                     Text("Annuleren")
                 }
+            }
+        )
+    }
+    
+    // Connection Test Dialog
+    if (showConnectionTestDialog) {
+        ConnectionTestDialog(
+            state = connectionTestState,
+            onDismiss = {
+                showConnectionTestDialog = false
+                viewModel.resetConnectionTest()
+            },
+            onRetry = {
+                viewModel.testConnection()
             }
         )
     }

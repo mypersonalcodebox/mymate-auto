@@ -14,6 +14,8 @@ import androidx.car.app.validation.HostValidator
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.mymate.auto.data.local.PreferencesManager
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -136,9 +138,9 @@ class MyMateSession : Session() {
     }
     
     private fun sendParkingNotification(location: Location?) {
-        val prefs = carContext.getSharedPreferences("mymate_prefs", Context.MODE_PRIVATE)
-        val webhookUrl = prefs.getString("webhook_url", "") 
-            ?: return
+        val preferencesManager = PreferencesManager(carContext)
+        val webhookUrl = runBlocking { preferencesManager.getWebhookUrlSync() }
+        if (webhookUrl.isEmpty()) return
         
         val client = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)

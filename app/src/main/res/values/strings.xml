@@ -52,10 +52,14 @@
     
     <!-- Error Messages -->
     <string name="error_generic">An error occurred</string>
-    <string name="error_unknown">Unknown error</string>
+    <string name="error_unknown">Something went wrong. Please try again later.</string>
     <string name="error_network">Network error</string>
     <string name="error_server">Server error</string>
-    <string name="error_timeout">Request timed out</string>
+    <string name="error_timeout">Request took too long. Please try again.</string>
+    <string name="error_no_internet">No internet connection. Check your network and try again.</string>
+    <string name="error_auth_failed">Authentication failed. Check your token in settings.</string>
+    <string name="error_gateway_unreachable">Gateway unreachable. Check if the server is running.</string>
+    <string name="error_retry">Try again</string>
     <string name="error_no_response">No response received</string>
     <string name="error_invalid_response">Invalid response</string>
     <string name="error_processing">Error processing response</string>

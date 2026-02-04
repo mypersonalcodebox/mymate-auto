@@ -52,10 +52,14 @@
     
     <!-- Error Messages -->
     <string name="error_generic">Er is een fout opgetreden</string>
-    <string name="error_unknown">Onbekende fout</string>
+    <string name="error_unknown">Er ging iets mis. Probeer het later opnieuw.</string>
     <string name="error_network">Netwerkfout</string>
     <string name="error_server">Serverfout</string>
-    <string name="error_timeout">Verzoek verlopen</string>
+    <string name="error_timeout">Verzoek duurde te lang. Probeer het opnieuw.</string>
+    <string name="error_no_internet">Geen internetverbinding. Controleer je netwerk en probeer opnieuw.</string>
+    <string name="error_auth_failed">Authenticatie mislukt. Controleer je token in de instellingen.</string>
+    <string name="error_gateway_unreachable">Gateway niet bereikbaar. Controleer of de server draait.</string>
+    <string name="error_retry">Opnieuw proberen</string>
     <string name="error_no_response">Geen antwoord ontvangen</string>
     <string name="error_invalid_response">Ongeldig antwoord</string>
     <string name="error_processing">Fout bij verwerken antwoord</string>

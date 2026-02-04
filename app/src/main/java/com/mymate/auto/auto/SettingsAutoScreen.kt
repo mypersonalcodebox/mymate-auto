@@ -4,27 +4,26 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import com.mymate.auto.data.local.PreferencesManager
+import kotlinx.coroutines.runBlocking
 
 class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "SettingsAutoScreen"
-    private val prefs = carContext.getSharedPreferences("mymate_prefs", CarContext.MODE_PRIVATE)
+    private val preferencesManager = PreferencesManager(carContext)
     
     private var ttsEnabled: Boolean
-        get() = prefs.getBoolean("tts_enabled", true)
-        set(value) = prefs.edit().putBoolean("tts_enabled", value).apply()
+        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
+        set(value) = runBlocking { preferencesManager.setTtsEnabled(value) }
     
-    private var gatewayHost: String
-        get() = prefs.getString("gateway_host", "") ?: ""
-        set(value) = prefs.edit().putString("gateway_host", value).apply()
+    private val gatewayUrl: String
+        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
     
-    private var gatewayPort: Int
-        get() = prefs.getInt("gateway_port", 18789)
-        set(value) = prefs.edit().putInt("gateway_port", value).apply()
+    private val gatewayToken: String
+        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
     
-    private var webhookUrl: String
-        get() = prefs.getString("webhook_url", "") ?: ""
-        set(value) = prefs.edit().putString("webhook_url", value).apply()
+    private val webhookUrl: String
+        get() = runBlocking { preferencesManager.getWebhookUrlSync() }
     
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
@@ -41,17 +40,17 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Gateway Host
+        // Gateway URL
+        val gatewayDisplay = if (gatewayUrl.length > 40) gatewayUrl.take(40) + "..." else gatewayUrl
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🌐 Gateway Host")
-                .addText(gatewayHost)
+                .setTitle("🌐 Gateway URL")
+                .addText(gatewayDisplay)
                 .setOnClickListener {
-                    // Show info - can't edit via voice in Android Auto easily
                     screenManager.push(
                         MessageScreen(carContext, 
-                            "Gateway Host",
-                            "Huidige host: $gatewayHost\n\nWijzig deze instelling in de phone app."
+                            "Gateway URL",
+                            "Huidige URL: $gatewayUrl\n\nWijzig deze instelling in de phone app."
                         ) {
                             screenManager.pop()
                         }
@@ -60,16 +59,17 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Gateway Port
+        // Gateway Token
+        val tokenDisplay = if (gatewayToken.isNotEmpty()) "••••••••" else "(niet ingesteld)"
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🔌 Gateway Port")
-                .addText(gatewayPort.toString())
+                .setTitle("🔑 Gateway Token")
+                .addText(tokenDisplay)
                 .setOnClickListener {
                     screenManager.push(
                         MessageScreen(carContext, 
-                            "Gateway Port",
-                            "Huidige port: $gatewayPort\n\nWijzig deze instelling in de phone app."
+                            "Gateway Token",
+                            if (gatewayToken.isNotEmpty()) "Token is ingesteld.\n\nWijzig in de phone app." else "Geen token ingesteld.\n\nStel in via de phone app."
                         ) {
                             screenManager.pop()
                         }
@@ -97,20 +97,16 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Clear action history
+        // Clear action history - Note: This would require a clearActionUsage method in PreferencesManager
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🗑️ Actie-geschiedenis wissen")
                 .addText("Reset quick action volgorde")
                 .setOnClickListener {
-                    prefs.edit()
-                        .remove("action_usage")
-                        .remove("action_last_used")
-                        .apply()
                     screenManager.push(
                         MessageScreen(carContext, 
-                            "✅ Gewist",
-                            "Actie-geschiedenis is gewist. Quick actions staan weer in standaard volgorde."
+                            "ℹ️ Info",
+                            "Actie-geschiedenis wissen is beschikbaar in de phone app."
                         ) {
                             screenManager.pop()
                         }
