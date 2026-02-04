@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import okhttp3.*
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -33,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.21"
+        private const val CLIENT_VERSION = "2.22"
     }
     
     private val client = OkHttpClient.Builder()
@@ -386,16 +387,33 @@ class OpenClawWebSocket(
         return try {
             webSocket?.send(json) ?: return Result.failure(IllegalStateException("WebSocket is null"))
             
-            // Wait for response with timeout
+            // Wait for acknowledgment first (quick response)
+            withTimeout(30_000) {
+                deferred.await()
+            }
+            
+            // Now wait for the actual chat response via chatResponses flow
+            Log.d(TAG, "Waiting for chat response...")
             withTimeout(120_000) {
-                val response = deferred.await()
-                val text = response.get("text")?.asString 
-                    ?: response.get("content")?.asString 
-                    ?: response.toString()
-                Result.success(text)
+                // Collect from chatResponses until we get a complete response
+                val responseBuilder = StringBuilder()
+                chatResponses.first { response ->
+                    if (response.sessionKey == sk || response.sessionKey == sessionKey) {
+                        if (response.content.isNotEmpty()) {
+                            responseBuilder.append(response.content)
+                        }
+                        response.isComplete // Stop when complete
+                    } else {
+                        false
+                    }
+                }
+                val finalResponse = responseBuilder.toString()
+                Log.d(TAG, "Received complete response: ${finalResponse.take(100)}...")
+                Result.success(finalResponse)
             }
         } catch (e: Exception) {
             pendingRequests.remove(requestId)
+            Log.e(TAG, "sendChatMessage failed: ${e.message}", e)
             Result.failure(e)
         }
     }
