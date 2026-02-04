@@ -34,7 +34,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.25"
+        private const val CLIENT_VERSION = "2.26"
     }
     
     private val client = OkHttpClient.Builder()
@@ -52,7 +52,7 @@ class OpenClawWebSocket(
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState
     
-    private val _chatResponses = MutableSharedFlow<ChatResponse>()
+    private val _chatResponses = MutableSharedFlow<ChatResponse>(replay = 1, extraBufferCapacity = 10)
     val chatResponses: SharedFlow<ChatResponse> = _chatResponses
     
     private val _agentEvents = MutableSharedFlow<AgentEvent>()
@@ -383,6 +383,34 @@ class OpenClawWebSocket(
         val requestId = "chat-${requestIdCounter.incrementAndGet()}"
         val idempotencyKey = UUID.randomUUID().toString()
         
+        // Create a deferred for the final response - start listening BEFORE sending
+        val responseDeferred = CompletableDeferred<String>()
+        
+        // Start collecting chat responses in background BEFORE sending
+        val collectorJob = scope.launch {
+            try {
+                withTimeout(120_000) {
+                    chatResponses.first { response ->
+                        Log.d(TAG, "Checking response: sk=${response.sessionKey}, complete=${response.isComplete}, content=${response.content.take(30)}")
+                        if ((response.sessionKey == sk || response.sessionKey == sessionKey) && response.isComplete) {
+                            if (response.error != null) {
+                                responseDeferred.completeExceptionally(RuntimeException(response.error))
+                            } else {
+                                responseDeferred.complete(response.content)
+                            }
+                            true // Stop collecting
+                        } else {
+                            false // Keep collecting
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                if (!responseDeferred.isCompleted) {
+                    responseDeferred.completeExceptionally(e)
+                }
+            }
+        }
+        
         val request = buildJsonObject {
             put("type", "req")
             put("id", requestId)
@@ -394,40 +422,30 @@ class OpenClawWebSocket(
             }
         }
         
-        val deferred = CompletableDeferred<JsonObject>()
-        pendingRequests[requestId] = deferred
+        val ackDeferred = CompletableDeferred<JsonObject>()
+        pendingRequests[requestId] = ackDeferred
         
         val json = gson.toJson(request)
         Log.d(TAG, "Sending chat.send: $json")
         
         return try {
-            webSocket?.send(json) ?: return Result.failure(IllegalStateException("WebSocket is null"))
+            webSocket?.send(json) ?: run {
+                collectorJob.cancel()
+                return Result.failure(IllegalStateException("WebSocket is null"))
+            }
             
-            // Wait for acknowledgment first (quick response)
+            // Wait for acknowledgment (quick response)
             withTimeout(30_000) {
-                deferred.await()
+                ackDeferred.await()
             }
+            Log.d(TAG, "Got acknowledgment, waiting for response...")
             
-            // Now wait for the actual chat response via chatResponses flow
-            Log.d(TAG, "Waiting for chat response...")
-            withTimeout(120_000) {
-                // Collect from chatResponses until we get a complete response
-                val responseBuilder = StringBuilder()
-                chatResponses.first { response ->
-                    if (response.sessionKey == sk || response.sessionKey == sessionKey) {
-                        if (response.content.isNotEmpty()) {
-                            responseBuilder.append(response.content)
-                        }
-                        response.isComplete // Stop when complete
-                    } else {
-                        false
-                    }
-                }
-                val finalResponse = responseBuilder.toString()
-                Log.d(TAG, "Received complete response: ${finalResponse.take(100)}...")
-                Result.success(finalResponse)
-            }
+            // Wait for the actual chat response
+            val response = responseDeferred.await()
+            Log.d(TAG, "Received response: ${response.take(100)}...")
+            Result.success(response)
         } catch (e: Exception) {
+            collectorJob.cancel()
             pendingRequests.remove(requestId)
             Log.e(TAG, "sendChatMessage failed: ${e.message}", e)
             Result.failure(e)
