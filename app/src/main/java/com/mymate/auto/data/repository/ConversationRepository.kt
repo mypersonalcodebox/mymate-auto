@@ -95,7 +95,7 @@ class ConversationRepository(
         val userMessage = ConversationMessage(
             content = message,
             isFromUser = true,
-            quickActionId = "conversation"
+            topic = null
         )
         conversationDao.insertMessage(userMessage)
         
@@ -116,7 +116,7 @@ class ConversationRepository(
             IllegalStateException("WebSocket not initialized")
         )
         
-        val result = ws.sendConversationMessage(message, CONVERSATION_SESSION_KEY)
+        val result = ws.sendChatMessage(message, CONVERSATION_SESSION_KEY)
         
         return result.fold(
             onSuccess = { reply ->
@@ -125,17 +125,19 @@ class ConversationRepository(
                 val botMessage = ConversationMessage(
                     content = cleanReply,
                     isFromUser = false,
-                    quickActionId = "conversation"
+                    topic = null
                 )
                 conversationDao.insertMessage(botMessage)
                 
                 // TTS if enabled
-                if (preferencesManager.getTtsEnabledSync() && context != null) {
-                    try {
-                        val tts = TtsManager.getInstance(context)
-                        tts.speak(cleanReply)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "TTS failed: ${e.message}")
+                scope.launch {
+                    if (preferencesManager.getTtsEnabledSync() && context != null) {
+                        try {
+                            val tts = TtsManager.getInstance(context)
+                            tts.speak(cleanReply)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "TTS failed: ${e.message}")
+                        }
                     }
                 }
                 
@@ -160,16 +162,18 @@ class ConversationRepository(
                 val botMessage = ConversationMessage(
                     content = cleanReply,
                     isFromUser = false,
-                    quickActionId = "conversation"
+                    topic = null
                 )
                 conversationDao.insertMessage(botMessage)
                 
-                if (preferencesManager.getTtsEnabledSync() && context != null) {
-                    try {
-                        val tts = TtsManager.getInstance(context)
-                        tts.speak(cleanReply)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "TTS failed: ${e.message}")
+                scope.launch {
+                    if (preferencesManager.getTtsEnabledSync() && context != null) {
+                        try {
+                            val tts = TtsManager.getInstance(context)
+                            tts.speak(cleanReply)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "TTS failed: ${e.message}")
+                        }
                     }
                 }
                 
@@ -179,7 +183,7 @@ class ConversationRepository(
                 val errorMessage = ConversationMessage(
                     content = "Fout: ${error.localizedMessage ?: "Onbekende fout"}",
                     isFromUser = false,
-                    quickActionId = "conversation"
+                    topic = null
                 )
                 conversationDao.insertMessage(errorMessage)
                 Result.failure(error)
