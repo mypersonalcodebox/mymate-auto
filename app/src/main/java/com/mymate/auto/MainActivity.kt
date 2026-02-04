@@ -16,6 +16,9 @@ import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.ui.chat.ChatScreen
 import com.mymate.auto.ui.conversation.ConversationScreen
 import com.mymate.auto.ui.crashlogs.CrashLogsScreen
+import com.mymate.auto.ui.memories.MemoriesScreen
+import com.mymate.auto.ui.parking.ParkingScreen
+import com.mymate.auto.ui.reminders.RemindersScreen
 import com.mymate.auto.ui.settings.SettingsScreen
 import com.mymate.auto.ui.theme.MyMateAutoTheme
 import kotlinx.coroutines.flow.first
@@ -61,12 +64,45 @@ fun MyMateApp() {
                 },
                 onNavigateToConversation = {
                     navController.navigate("conversation")
+                },
+                onNavigateToParking = {
+                    navController.navigate("parking")
+                },
+                onNavigateToMemories = {
+                    navController.navigate("memories")
+                },
+                onNavigateToReminders = {
+                    navController.navigate("reminders")
                 }
             )
         }
         
         composable("conversation") {
             ConversationScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable("parking") {
+            ParkingScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable("memories") {
+            MemoriesScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable("reminders") {
+            RemindersScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

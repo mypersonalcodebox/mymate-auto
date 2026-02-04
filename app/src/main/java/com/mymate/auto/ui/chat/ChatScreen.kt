@@ -52,6 +52,9 @@ import java.util.*
 fun ChatScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToConversation: () -> Unit = {},
+    onNavigateToParking: () -> Unit = {},
+    onNavigateToMemories: () -> Unit = {},
+    onNavigateToReminders: () -> Unit = {},
     viewModel: ChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -132,13 +135,62 @@ fun ChatScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 actions = {
-                    // Conversation mode button
-                    IconButton(onClick = onNavigateToConversation) {
-                        Icon(Icons.Default.Chat, contentDescription = "Gesprek modus")
+                    // Features dropdown menu
+                    var showFeaturesMenu by remember { mutableStateOf(false) }
+                    
+                    Box {
+                        IconButton(onClick = { showFeaturesMenu = true }) {
+                            Icon(Icons.Default.Apps, contentDescription = "Features")
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showFeaturesMenu,
+                            onDismissRequest = { showFeaturesMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("💬 Gesprek modus") },
+                                onClick = {
+                                    showFeaturesMenu = false
+                                    onNavigateToConversation()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("🚗 Parkeerlocaties") },
+                                onClick = {
+                                    showFeaturesMenu = false
+                                    onNavigateToParking()
+                                },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("📝 Memories") },
+                                onClick = {
+                                    showFeaturesMenu = false
+                                    onNavigateToMemories()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Lightbulb, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("🔔 Herinneringen") },
+                                onClick = {
+                                    showFeaturesMenu = false
+                                    onNavigateToReminders()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Wis geschiedenis") },
+                                onClick = {
+                                    showFeaturesMenu = false
+                                    viewModel.clearHistory()
+                                },
+                                leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null) }
+                            )
+                        }
                     }
-                    IconButton(onClick = { viewModel.clearHistory() }) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Wis geschiedenis")
-                    }
+                    
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Instellingen")
                     }

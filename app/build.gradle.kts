@@ -12,8 +12,8 @@ android {
         applicationId = "com.mymate.auto"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "2.28"
+        versionCode = 29
+        versionName = "2.29"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -100,4 +100,7 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Google Play Services Location (for GPS/parking location)
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }

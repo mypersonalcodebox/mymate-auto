@@ -32,6 +32,11 @@ class PreferencesManager(private val context: Context) {
         val USE_OPENCLAW_WEBSOCKET = booleanPreferencesKey("use_openclaw_websocket")
         val SESSION_KEY = stringPreferencesKey("session_key")
         
+        // Parking settings
+        val AUTO_SAVE_PARKING = booleanPreferencesKey("auto_save_parking")
+        val SEND_PARKING_TO_TELEGRAM = booleanPreferencesKey("send_parking_to_telegram")
+        val PARKING_RETENTION_DAYS = intPreferencesKey("parking_retention_days")
+        
         const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
         const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
         const val DEFAULT_GATEWAY_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
@@ -194,5 +199,44 @@ class PreferencesManager(private val context: Context) {
     
     suspend fun getTtsEnabledSync(): Boolean {
         return context.dataStore.data.first()[TTS_ENABLED] ?: true
+    }
+    
+    // Parking settings
+    val autoSaveParking: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[AUTO_SAVE_PARKING] ?: true
+    }
+    
+    val sendParkingToTelegram: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SEND_PARKING_TO_TELEGRAM] ?: true
+    }
+    
+    val parkingRetentionDays: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[PARKING_RETENTION_DAYS] ?: 30
+    }
+    
+    suspend fun setAutoSaveParking(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[AUTO_SAVE_PARKING] = enabled
+        }
+    }
+    
+    suspend fun setSendParkingToTelegram(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[SEND_PARKING_TO_TELEGRAM] = enabled
+        }
+    }
+    
+    suspend fun setParkingRetentionDays(days: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[PARKING_RETENTION_DAYS] = days
+        }
+    }
+    
+    suspend fun getAutoSaveParkingSync(): Boolean {
+        return context.dataStore.data.first()[AUTO_SAVE_PARKING] ?: true
+    }
+    
+    suspend fun getSendParkingToTelegramSync(): Boolean {
+        return context.dataStore.data.first()[SEND_PARKING_TO_TELEGRAM] ?: true
     }
 }
