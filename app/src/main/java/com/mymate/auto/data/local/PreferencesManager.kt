@@ -34,6 +34,7 @@ class PreferencesManager(private val context: Context) {
         
         const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
         const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
+        const val DEFAULT_GATEWAY_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
         const val DEFAULT_SESSION_KEY = "agent:main:mymate"
     }
     
@@ -67,8 +68,8 @@ class PreferencesManager(private val context: Context) {
         prefs[GATEWAY_URL] ?: DEFAULT_GATEWAY_URL
     }
     
-    val gatewayToken: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[GATEWAY_TOKEN]
+    val gatewayToken: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[GATEWAY_TOKEN] ?: DEFAULT_GATEWAY_TOKEN
     }
     
     val useOpenClawWebSocket: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -143,8 +144,8 @@ class PreferencesManager(private val context: Context) {
         return context.dataStore.data.first()[GATEWAY_URL] ?: DEFAULT_GATEWAY_URL
     }
     
-    suspend fun getGatewayTokenSync(): String? {
-        return context.dataStore.data.first()[GATEWAY_TOKEN]
+    suspend fun getGatewayTokenSync(): String {
+        return context.dataStore.data.first()[GATEWAY_TOKEN] ?: DEFAULT_GATEWAY_TOKEN
     }
     
     suspend fun getSessionKeySync(): String {
