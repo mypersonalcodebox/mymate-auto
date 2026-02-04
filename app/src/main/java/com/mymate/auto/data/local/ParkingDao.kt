@@ -10,6 +10,9 @@ interface ParkingDao {
     @Query("SELECT * FROM parking_locations ORDER BY timestamp DESC")
     fun getAllLocations(): Flow<List<ParkingLocation>>
     
+    @Query("SELECT * FROM parking_locations ORDER BY timestamp DESC")
+    suspend fun getAllParkingLocations(): List<ParkingLocation>
+    
     @Query("SELECT * FROM parking_locations ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentLocations(limit: Int = 20): Flow<List<ParkingLocation>>
     
@@ -22,11 +25,17 @@ interface ParkingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(location: ParkingLocation): Long
     
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertParkingLocation(location: ParkingLocation): Long
+    
     @Update
     suspend fun update(location: ParkingLocation)
     
     @Delete
     suspend fun delete(location: ParkingLocation)
+    
+    @Delete
+    suspend fun deleteParkingLocation(location: ParkingLocation)
     
     @Query("UPDATE parking_locations SET isActive = 0 WHERE isActive = 1")
     suspend fun deactivateAll()

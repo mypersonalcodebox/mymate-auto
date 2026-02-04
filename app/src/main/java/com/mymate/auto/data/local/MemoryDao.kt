@@ -9,10 +9,19 @@ import kotlinx.coroutines.flow.Flow
 interface MemoryDao {
     
     @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
-    fun getAllMemories(): Flow<List<Memory>>
+    fun getAllMemoriesFlow(): Flow<List<Memory>>
+    
+    @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
+    suspend fun getAllMemories(): List<Memory>
     
     @Query("SELECT * FROM memories WHERE category = :category ORDER BY updatedAt DESC")
     fun getByCategory(category: MemoryCategory): Flow<List<Memory>>
+    
+    @Query("SELECT * FROM memories WHERE category = :category ORDER BY updatedAt DESC")
+    suspend fun getMemoriesByCategory(category: MemoryCategory): List<Memory>
+    
+    @Query("SELECT DISTINCT category FROM memories")
+    suspend fun getAllCategories(): List<MemoryCategory>
     
     @Query("SELECT * FROM memories WHERE category = 'TODO' ORDER BY createdAt DESC")
     fun getTodos(): Flow<List<Memory>>
@@ -26,11 +35,17 @@ interface MemoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(memory: Memory): Long
     
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMemory(memory: Memory): Long
+    
     @Update
     suspend fun update(memory: Memory)
     
     @Delete
     suspend fun delete(memory: Memory)
+    
+    @Delete
+    suspend fun deleteMemory(memory: Memory)
     
     @Query("UPDATE memories SET isSynced = 1 WHERE id = :id")
     suspend fun markSynced(id: Long)

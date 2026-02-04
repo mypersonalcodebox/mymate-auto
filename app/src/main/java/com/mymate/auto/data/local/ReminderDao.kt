@@ -10,8 +10,14 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE isCompleted = 0 ORDER BY triggerTime ASC")
     fun getActiveReminders(): Flow<List<Reminder>>
     
+    @Query("SELECT * FROM reminders WHERE isCompleted = 0 ORDER BY triggerTime ASC")
+    suspend fun getPendingReminders(): List<Reminder>
+    
     @Query("SELECT * FROM reminders ORDER BY triggerTime DESC")
-    fun getAllReminders(): Flow<List<Reminder>>
+    fun getAllRemindersFlow(): Flow<List<Reminder>>
+    
+    @Query("SELECT * FROM reminders ORDER BY triggerTime DESC")
+    suspend fun getAllReminders(): List<Reminder>
     
     @Query("SELECT * FROM reminders WHERE isCompleted = 0 AND triggerTime <= :time ORDER BY triggerTime ASC")
     suspend fun getDueReminders(time: Long = System.currentTimeMillis()): List<Reminder>
@@ -22,11 +28,20 @@ interface ReminderDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(reminder: Reminder): Long
     
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReminder(reminder: Reminder): Long
+    
     @Update
     suspend fun update(reminder: Reminder)
     
+    @Update
+    suspend fun updateReminder(reminder: Reminder)
+    
     @Delete
     suspend fun delete(reminder: Reminder)
+    
+    @Delete
+    suspend fun deleteReminder(reminder: Reminder)
     
     @Query("UPDATE reminders SET isCompleted = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
