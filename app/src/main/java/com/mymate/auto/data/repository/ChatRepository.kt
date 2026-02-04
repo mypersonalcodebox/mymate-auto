@@ -1,5 +1,6 @@
 package com.mymate.auto.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.mymate.auto.data.local.ChatDao
 import com.mymate.auto.data.local.PreferencesManager
@@ -8,6 +9,8 @@ import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.model.QuickActions
 import com.mymate.auto.data.remote.MyMateApiClient
 import com.mymate.auto.data.remote.OpenClawWebSocket
+import com.mymate.auto.service.TtsManager
+import com.mymate.auto.util.TextUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +23,8 @@ import kotlinx.coroutines.launch
 class ChatRepository(
     private val chatDao: ChatDao,
     private val apiClient: MyMateApiClient,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val context: Context? = null
 ) {
     companion object {
         private const val TAG = "ChatRepository"
@@ -65,18 +69,8 @@ class ChatRepository(
                 }
             }
             
-            // Collect chat responses and save to database
-            scope.launch {
-                chatResponses.collect { response ->
-                    if (response.isComplete && response.content.isNotEmpty()) {
-                        val botMessage = ChatMessage(
-                            content = response.content,
-                            isFromUser = false
-                        )
-                        chatDao.insertMessage(botMessage)
-                    }
-                }
-            }
+            // Note: Chat responses are saved in sendViaWebSocket, not here
+            // to avoid duplicate messages
             
             connect(autoReconnect = true)
         }
@@ -146,12 +140,26 @@ class ChatRepository(
         
         return result.fold(
             onSuccess = { reply ->
+                // Strip markdown for clean display
+                val cleanReply = TextUtils.stripMarkdown(reply)
+                
                 val botMessage = ChatMessage(
-                    content = reply,
+                    content = cleanReply,
                     isFromUser = false,
                     quickActionId = quickActionId
                 )
                 chatDao.insertMessage(botMessage)
+                
+                // Speak the response if TTS is enabled
+                if (preferencesManager.getTtsEnabledSync() && context != null) {
+                    try {
+                        val tts = TtsManager.getInstance(context)
+                        tts.speak(cleanReply)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "TTS failed: ${e.message}")
+                    }
+                }
+                
                 Result.success(botMessage)
             },
             onFailure = { error ->
@@ -172,17 +180,31 @@ class ChatRepository(
         return result.fold(
             onSuccess = { response ->
                 val reply = response.reply ?: response.error ?: "Geen antwoord ontvangen"
+                // Strip markdown for clean display
+                val cleanReply = TextUtils.stripMarkdown(reply)
+                
                 val botMessage = ChatMessage(
-                    content = reply,
+                    content = cleanReply,
                     isFromUser = false,
                     quickActionId = quickActionId
                 )
                 chatDao.insertMessage(botMessage)
+                
+                // Speak the response if TTS is enabled
+                if (preferencesManager.getTtsEnabledSync() && context != null) {
+                    try {
+                        val tts = TtsManager.getInstance(context)
+                        tts.speak(cleanReply)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "TTS failed: ${e.message}")
+                    }
+                }
+                
                 Result.success(botMessage)
             },
             onFailure = { error ->
                 val errorMessage = ChatMessage(
-                    content = "❌ Fout: ${error.localizedMessage ?: "Onbekende fout"}",
+                    content = "Fout: ${error.localizedMessage ?: "Onbekende fout"}",
                     isFromUser = false,
                     quickActionId = quickActionId
                 )

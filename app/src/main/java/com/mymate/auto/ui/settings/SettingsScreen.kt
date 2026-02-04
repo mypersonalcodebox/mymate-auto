@@ -194,7 +194,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "Versie",
-                    subtitle = "2.11 (met OpenClaw WebSocket)",
+                    subtitle = "2.25 (WebSocket + TTS + Markdown)",
                     onClick = { }
                 )
                 

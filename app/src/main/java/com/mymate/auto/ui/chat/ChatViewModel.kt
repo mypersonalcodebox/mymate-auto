@@ -22,7 +22,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ChatRepository(
         database.chatDao(),
         apiClient,
-        preferencesManager
+        preferencesManager,
+        application.applicationContext
     )
     
     private val _uiState = MutableStateFlow(ChatUiState())
