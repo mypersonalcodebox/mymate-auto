@@ -88,14 +88,15 @@ class PreferencesManager(private val context: Context) {
     suspend fun incrementActionUsage(actionId: String) {
         context.dataStore.edit { prefs ->
             val usageJson = prefs[ACTION_USAGE] ?: "{}"
-            val type = object : TypeToken<MutableMap<String, Int>>() {}.type
-            val usageMap: MutableMap<String, Int> = gson.fromJson(usageJson, type) ?: mutableMapOf()
+            val intMapType = object : TypeToken<MutableMap<String, Int>>() {}.type
+            val usageMap: MutableMap<String, Int> = gson.fromJson(usageJson, intMapType) ?: mutableMapOf()
             usageMap[actionId] = (usageMap[actionId] ?: 0) + 1
             prefs[ACTION_USAGE] = gson.toJson(usageMap)
             
-            // Update last used
+            // Update last used - use Long type for timestamps!
             val lastUsedJson = prefs[ACTION_LAST_USED] ?: "{}"
-            val lastUsedMap: MutableMap<String, Long> = gson.fromJson(lastUsedJson, type) ?: mutableMapOf()
+            val longMapType = object : TypeToken<MutableMap<String, Long>>() {}.type
+            val lastUsedMap: MutableMap<String, Long> = gson.fromJson(lastUsedJson, longMapType) ?: mutableMapOf()
             lastUsedMap[actionId] = System.currentTimeMillis()
             prefs[ACTION_LAST_USED] = gson.toJson(lastUsedMap)
         }
