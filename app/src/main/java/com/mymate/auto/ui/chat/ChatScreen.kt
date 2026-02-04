@@ -320,19 +320,20 @@ fun ChatScreen(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Voice input button
-                    IconButton(
+                    // Voice input button - prominent FAB style
+                    FloatingActionButton(
                         onClick = { launchVoiceInput() },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             Icons.Default.Mic,
-                            contentDescription = "Spraak invoer",
-                            tint = PrimaryBlue
+                            contentDescription = "Spraak invoer"
                         )
                     }
                     
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     
                     FloatingActionButton(
                         onClick = {
