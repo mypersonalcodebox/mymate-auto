@@ -33,7 +33,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.20"
+        private const val CLIENT_VERSION = "2.21"
     }
     
     private val client = OkHttpClient.Builder()
@@ -372,7 +372,7 @@ class OpenClawWebSocket(
             put("method", "chat.send")
             putObject("params") {
                 put("sessionKey", sk)
-                put("text", message)
+                put("message", message)
                 put("idempotencyKey", idempotencyKey)
             }
         }
