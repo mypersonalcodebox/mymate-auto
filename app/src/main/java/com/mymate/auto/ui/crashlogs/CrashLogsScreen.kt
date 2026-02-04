@@ -161,6 +161,7 @@ fun CrashLogsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CrashLogCard(
     filename: String,
