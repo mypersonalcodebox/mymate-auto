@@ -41,7 +41,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
-import com.mymate.auto.data.remote.WebSocketManager
+import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -358,10 +358,15 @@ fun ChatScreen(
 }
 
 @Composable
-fun ConnectionIndicator(state: WebSocketManager.ConnectionState) {
-    // Always show HTTP mode since WebSocket is disabled by default
-    // The app uses HTTP for all communication with the webhook
-    val (color, text) = SuccessGreen to "HTTP"
+fun ConnectionIndicator(state: OpenClawWebSocket.ConnectionState) {
+    val (color, text) = when (state) {
+        OpenClawWebSocket.ConnectionState.CONNECTED -> SuccessGreen to "🦞 Gateway"
+        OpenClawWebSocket.ConnectionState.CONNECTING -> WarningYellow to "Verbinden..."
+        OpenClawWebSocket.ConnectionState.HANDSHAKING -> WarningYellow to "Auth..."
+        OpenClawWebSocket.ConnectionState.RECONNECTING -> WarningYellow to "Herverbinden..."
+        OpenClawWebSocket.ConnectionState.ERROR -> ErrorRed to "Fout"
+        OpenClawWebSocket.ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant to "HTTP"
+    }
     
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(

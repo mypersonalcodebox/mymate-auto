@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mymate.auto.ui.theme.PrimaryBlue
@@ -27,7 +29,13 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showWebhookDialog by remember { mutableStateOf(false) }
+    var showGatewayDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
+    var showSessionKeyDialog by remember { mutableStateOf(false) }
     var tempWebhookUrl by remember { mutableStateOf("") }
+    var tempGatewayUrl by remember { mutableStateOf("") }
+    var tempToken by remember { mutableStateOf("") }
+    var tempSessionKey by remember { mutableStateOf("") }
     
     Scaffold(
         topBar = {
@@ -50,8 +58,51 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Connection Section
-            SettingsSection(title = "Verbinding") {
+            // OpenClaw Gateway Section (primary)
+            SettingsSection(title = "🦞 OpenClaw Gateway") {
+                SettingsSwitch(
+                    icon = Icons.Default.Cable,
+                    title = "WebSocket verbinding",
+                    subtitle = if (uiState.useOpenClawWebSocket) "Real-time via Gateway" else "HTTP Webhook fallback",
+                    checked = uiState.useOpenClawWebSocket,
+                    onCheckedChange = { viewModel.setUseOpenClawWebSocket(it) }
+                )
+                
+                SettingsItem(
+                    icon = Icons.Default.Cloud,
+                    title = "Gateway URL",
+                    subtitle = uiState.gatewayUrl,
+                    onClick = {
+                        tempGatewayUrl = uiState.gatewayUrl
+                        showGatewayDialog = true
+                    }
+                )
+                
+                SettingsItem(
+                    icon = Icons.Default.Key,
+                    title = "Auth Token",
+                    subtitle = if (uiState.gatewayToken != null) "••••••••" else "Niet ingesteld",
+                    onClick = {
+                        tempToken = uiState.gatewayToken ?: ""
+                        showTokenDialog = true
+                    }
+                )
+                
+                SettingsItem(
+                    icon = Icons.Default.AccountCircle,
+                    title = "Session Key",
+                    subtitle = uiState.sessionKey,
+                    onClick = {
+                        tempSessionKey = uiState.sessionKey
+                        showSessionKeyDialog = true
+                    }
+                )
+            }
+            
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // Fallback Connection Section
+            SettingsSection(title = "HTTP Fallback") {
                 SettingsItem(
                     icon = Icons.Default.Link,
                     title = "Webhook URL",
@@ -60,14 +111,6 @@ fun SettingsScreen(
                         tempWebhookUrl = uiState.webhookUrl
                         showWebhookDialog = true
                     }
-                )
-                
-                SettingsSwitch(
-                    icon = Icons.Default.Wifi,
-                    title = "WebSocket verbinding",
-                    subtitle = "Real-time berichten ontvangen",
-                    checked = uiState.webSocketEnabled,
-                    onCheckedChange = { viewModel.setWebSocketEnabled(it) }
                 )
                 
                 SettingsSwitch(
@@ -151,7 +194,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "Versie",
-                    subtitle = "2.9 (met crash logging)",
+                    subtitle = "2.11 (met OpenClaw WebSocket)",
                     onClick = { }
                 )
                 
@@ -177,7 +220,7 @@ fun SettingsScreen(
                     value = tempWebhookUrl,
                     onValueChange = { tempWebhookUrl = it },
                     label = { Text("URL") },
-                    placeholder = { Text("http://100.124.24.27:18791/auto") },
+                    placeholder = { Text("http://100.124.24.27:18789/hooks/agent") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth()
@@ -195,6 +238,140 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showWebhookDialog = false }) {
+                    Text("Annuleren")
+                }
+            }
+        )
+    }
+    
+    // Gateway URL Dialog
+    if (showGatewayDialog) {
+        AlertDialog(
+            onDismissRequest = { showGatewayDialog = false },
+            title = { Text("Gateway URL") },
+            text = {
+                Column {
+                    Text(
+                        "WebSocket URL van de OpenClaw Gateway",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tempGatewayUrl,
+                        onValueChange = { tempGatewayUrl = it },
+                        label = { Text("URL") },
+                        placeholder = { Text("ws://100.124.24.27:18789") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setGatewayUrl(tempGatewayUrl)
+                        showGatewayDialog = false
+                    }
+                ) {
+                    Text("Opslaan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGatewayDialog = false }) {
+                    Text("Annuleren")
+                }
+            }
+        )
+    }
+    
+    // Auth Token Dialog
+    if (showTokenDialog) {
+        var showToken by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showTokenDialog = false },
+            title = { Text("Auth Token") },
+            text = {
+                Column {
+                    Text(
+                        "Gateway authenticatie token (optioneel)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tempToken,
+                        onValueChange = { tempToken = it },
+                        label = { Text("Token") },
+                        placeholder = { Text("Je auth token") },
+                        singleLine = true,
+                        visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showToken = !showToken }) {
+                                Icon(
+                                    if (showToken) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (showToken) "Verberg" else "Toon"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setGatewayToken(tempToken.ifBlank { null })
+                        showTokenDialog = false
+                    }
+                ) {
+                    Text("Opslaan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTokenDialog = false }) {
+                    Text("Annuleren")
+                }
+            }
+        )
+    }
+    
+    // Session Key Dialog
+    if (showSessionKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showSessionKeyDialog = false },
+            title = { Text("Session Key") },
+            text = {
+                Column {
+                    Text(
+                        "OpenClaw session identifier voor chat history",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tempSessionKey,
+                        onValueChange = { tempSessionKey = it },
+                        label = { Text("Session Key") },
+                        placeholder = { Text("agent:main:mymate") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setSessionKey(tempSessionKey)
+                        showSessionKeyDialog = false
+                    }
+                ) {
+                    Text("Opslaan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSessionKeyDialog = false }) {
                     Text("Annuleren")
                 }
             }
@@ -249,7 +426,8 @@ fun SettingsItem(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
             Icon(

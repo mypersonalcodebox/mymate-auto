@@ -8,7 +8,7 @@ import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ChatMessage
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.remote.MyMateApiClient
-import com.mymate.auto.data.remote.WebSocketManager
+import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.data.repository.ChatRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,7 +18,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getInstance(application)
     private val preferencesManager = PreferencesManager(application)
     private val apiClient = MyMateApiClient()
-    private val webSocketManager = WebSocketManager()
     
     private val repository = ChatRepository(
         database.chatDao(),
@@ -30,7 +29,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     
     val messages: Flow<List<ChatMessage>> = repository.getAllMessages()
-    val connectionState = webSocketManager.connectionState
+    
+    // Expose WebSocket connection state from repository
+    val connectionState: StateFlow<OpenClawWebSocket.ConnectionState> = repository.webSocketState
     
     init {
         // Load quick actions sorted by usage
@@ -39,33 +40,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(quickActions = sortedActions) }
         }
         
-        // Monitor WebSocket messages
+        // Monitor connection state for UI updates
         viewModelScope.launch {
-            webSocketManager.incomingMessages.collect { message ->
-                when (message.type) {
-                    "notification", "message" -> {
-                        message.content?.let { content ->
-                            // Add incoming message to chat
-                            database.chatDao().insertMessage(
-                                ChatMessage(
-                                    content = content,
-                                    isFromUser = false
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Connect WebSocket
-        viewModelScope.launch {
-            preferencesManager.webSocketEnabled.collect { enabled ->
-                if (enabled) {
-                    webSocketManager.connect()
-                } else {
-                    webSocketManager.disconnect()
-                }
+            repository.webSocketState.collect { state ->
+                _uiState.update { it.copy(connectionStatus = state.toDisplayString()) }
             }
         }
     }
@@ -121,17 +99,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun reconnectWebSocket() {
-        webSocketManager.connect(autoReconnect = true)
+        repository.connectWebSocket()
+    }
+    
+    fun disconnectWebSocket() {
+        repository.disconnectWebSocket()
     }
     
     override fun onCleared() {
         super.onCleared()
-        webSocketManager.cleanup()
+        repository.cleanup()
     }
 }
 
 data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val quickActions: List<QuickAction> = emptyList()
+    val quickActions: List<QuickAction> = emptyList(),
+    val connectionStatus: String = "Niet verbonden"
 )
+
+private fun OpenClawWebSocket.ConnectionState.toDisplayString(): String = when (this) {
+    OpenClawWebSocket.ConnectionState.CONNECTING -> "Verbinden..."
+    OpenClawWebSocket.ConnectionState.HANDSHAKING -> "Authenticeren..."
+    OpenClawWebSocket.ConnectionState.CONNECTED -> "🦞 Verbonden"
+    OpenClawWebSocket.ConnectionState.DISCONNECTED -> "Niet verbonden"
+    OpenClawWebSocket.ConnectionState.RECONNECTING -> "Herverbinden..."
+    OpenClawWebSocket.ConnectionState.ERROR -> "Verbindingsfout"
+}

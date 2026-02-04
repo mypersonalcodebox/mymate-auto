@@ -25,6 +25,7 @@ val BotMessageBubble = Color(0xFF424242)
 val BotMessageBubbleLight = Color(0xFFE8E8E8)
 val ErrorRed = Color(0xFFCF6679)
 val SuccessGreen = Color(0xFF4CAF50)
+val WarningYellow = Color(0xFFFFC107)
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryBlue,
