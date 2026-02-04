@@ -217,13 +217,9 @@ fun ChatScreen(
 
 @Composable
 fun ConnectionIndicator(state: WebSocketManager.ConnectionState) {
-    val (color, text) = when (state) {
-        WebSocketManager.ConnectionState.CONNECTED -> SuccessGreen to "Online"
-        WebSocketManager.ConnectionState.CONNECTING -> Color.Yellow to "Verbinden..."
-        WebSocketManager.ConnectionState.RECONNECTING -> Color.Yellow to "Herverbinden..."
-        WebSocketManager.ConnectionState.ERROR -> ErrorRed to "Fout"
-        WebSocketManager.ConnectionState.DISCONNECTED -> Color.Gray to "Offline"
-    }
+    // Always show HTTP mode since WebSocket is disabled by default
+    // The app uses HTTP for all communication with the webhook
+    val (color, text) = SuccessGreen to "HTTP"
     
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
