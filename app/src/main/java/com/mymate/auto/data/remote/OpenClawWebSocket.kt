@@ -33,7 +33,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "openclaw-android"
-        private const val CLIENT_VERSION = "2.18"
+        private const val CLIENT_VERSION = "2.19"
     }
     
     private val client = OkHttpClient.Builder()
@@ -195,9 +195,7 @@ class OpenClawWebSocket(
                 }
                 put("locale", "nl-NL")
                 put("userAgent", "$CLIENT_ID/$CLIENT_VERSION")
-                putObject("device") {
-                    put("id", deviceId)
-                }
+                // Note: device object removed - requires full signing which we don't implement
             }
         }
         
