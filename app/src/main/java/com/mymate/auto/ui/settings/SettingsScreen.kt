@@ -182,6 +182,17 @@ fun SettingsScreen(
                     checked = uiState.darkMode,
                     onCheckedChange = { viewModel.setDarkMode(it) }
                 )
+                
+                // Language Toggle
+                SettingsItem(
+                    icon = Icons.Default.Language,
+                    title = "Taal / Language",
+                    subtitle = if (uiState.appLanguage == "nl") "🇳🇱 Nederlands" else "🇬🇧 English",
+                    onClick = {
+                        val newLang = if (uiState.appLanguage == "nl") "en" else "nl"
+                        viewModel.setAppLanguage(newLang)
+                    }
+                )
             }
             
             Divider(modifier = Modifier.padding(vertical = 8.dp))

@@ -40,10 +40,17 @@ class PreferencesManager(private val context: Context) {
         val SEND_PARKING_TO_TELEGRAM = booleanPreferencesKey("send_parking_to_telegram")
         val PARKING_RETENTION_DAYS = intPreferencesKey("parking_retention_days")
         
-        const val DEFAULT_WEBHOOK_URL = ""
-        const val DEFAULT_GATEWAY_URL = "ws://your-gateway:18789"
-        const val DEFAULT_GATEWAY_TOKEN = ""
+        // Default credentials - keep for personal use, new users will configure via setup
+        const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
+        const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
+        const val DEFAULT_GATEWAY_TOKEN = "969802d413a94e7e4950fc6d12c441ea5b316b65df1fb7cb"
         const val DEFAULT_SESSION_KEY = "agent:main:mymate"
+        
+        // Language setting
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
+        const val LANGUAGE_DUTCH = "nl"
+        const val LANGUAGE_ENGLISH = "en"
+        const val DEFAULT_LANGUAGE = LANGUAGE_DUTCH
     }
     
     val webhookUrl: Flow<String> = context.dataStore.data.map { prefs ->
@@ -87,6 +94,10 @@ class PreferencesManager(private val context: Context) {
     
     val sessionKey: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[SESSION_KEY] ?: DEFAULT_SESSION_KEY
+    }
+    
+    val appLanguage: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[APP_LANGUAGE] ?: DEFAULT_LANGUAGE
     }
     
     suspend fun setWebhookUrl(url: String) {
@@ -146,6 +157,16 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[SESSION_KEY] = key
         }
+    }
+    
+    suspend fun setAppLanguage(language: String) {
+        context.dataStore.edit { prefs ->
+            prefs[APP_LANGUAGE] = language
+        }
+    }
+    
+    suspend fun getAppLanguageSync(): String {
+        return context.dataStore.data.first()[APP_LANGUAGE] ?: DEFAULT_LANGUAGE
     }
     
     suspend fun getGatewayUrlSync(): String {

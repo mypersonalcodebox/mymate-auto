@@ -46,7 +46,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 preferencesManager.gatewayUrl,
                 preferencesManager.gatewayToken,
                 preferencesManager.useOpenClawWebSocket,
-                preferencesManager.sessionKey
+                preferencesManager.sessionKey,
+                preferencesManager.appLanguage
             ) { values ->
                 SettingsUiState(
                     webhookUrl = values[0] as String,
@@ -58,7 +59,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     gatewayUrl = values[6] as String,
                     gatewayToken = values[7] as? String,
                     useOpenClawWebSocket = values[8] as Boolean,
-                    sessionKey = values[9] as String
+                    sessionKey = values[9] as String,
+                    appLanguage = values[10] as String
                 )
             }.collect { state ->
                 _uiState.value = state
@@ -125,6 +127,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setSessionKey(key: String) {
         viewModelScope.launch {
             preferencesManager.setSessionKey(key)
+        }
+    }
+    
+    fun setAppLanguage(language: String) {
+        viewModelScope.launch {
+            preferencesManager.setAppLanguage(language)
         }
     }
     
@@ -313,7 +321,9 @@ data class SettingsUiState(
     val gatewayUrl: String = PreferencesManager.DEFAULT_GATEWAY_URL,
     val gatewayToken: String? = null,
     val useOpenClawWebSocket: Boolean = true,
-    val sessionKey: String = PreferencesManager.DEFAULT_SESSION_KEY
+    val sessionKey: String = PreferencesManager.DEFAULT_SESSION_KEY,
+    // Language setting
+    val appLanguage: String = PreferencesManager.DEFAULT_LANGUAGE
 )
 
 sealed class ConnectionTestState {
