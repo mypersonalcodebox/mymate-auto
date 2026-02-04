@@ -33,7 +33,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "mymate-android-auto"
-        private const val CLIENT_VERSION = "2.11"
+        private const val CLIENT_VERSION = "2.14"
     }
     
     private val client = OkHttpClient.Builder()
@@ -58,7 +58,7 @@ class OpenClawWebSocket(
     val agentEvents: SharedFlow<AgentEvent> = _agentEvents
     
     private var isConnected = false
-    private var sessionKey: String = "agent:main:mymate"
+    private var sessionKey: String = "agent:main:main"
     
     enum class ConnectionState {
         CONNECTING,
@@ -104,10 +104,10 @@ class OpenClawWebSocket(
         
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "WebSocket opened, sending connect handshake")
+                Log.d(TAG, "WebSocket opened, waiting for connect.challenge")
                 _connectionState.value = ConnectionState.HANDSHAKING
                 reconnectJob?.cancel()
-                sendConnectHandshake(webSocket)
+                // Don't send connect yet - wait for connect.challenge event from Gateway
             }
             
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -276,6 +276,11 @@ class OpenClawWebSocket(
         Log.d(TAG, "Event: $event")
         
         when (event) {
+            "connect.challenge" -> {
+                // Gateway sends challenge, now we can send our connect request
+                Log.d(TAG, "Received connect.challenge, sending handshake")
+                webSocket?.let { sendConnectHandshake(it) }
+            }
             "tick" -> {
                 // Heartbeat from server, connection is alive
                 Log.d(TAG, "Tick received")
