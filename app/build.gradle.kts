@@ -12,8 +12,8 @@ android {
         applicationId = "com.mymate.auto"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "2.34"
+        versionCode = 35
+        versionName = "2.35"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -24,13 +24,20 @@ android {
         getByName("debug") {
             // Use default debug keystore
         }
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: "../mymate-upload.keystore"
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "MyMate2026!"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "mymate"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "MyMate2026!"
+        }
     }
     
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug") // Sign release with debug key for testing
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isDebuggable = true
