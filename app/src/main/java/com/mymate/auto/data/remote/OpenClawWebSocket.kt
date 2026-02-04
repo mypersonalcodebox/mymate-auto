@@ -33,7 +33,7 @@ class OpenClawWebSocket(
         private const val TAG = "OpenClawWebSocket"
         private const val PROTOCOL_VERSION = 3
         private const val CLIENT_ID = "mymate-android-auto"
-        private const val CLIENT_VERSION = "2.14"
+        private const val CLIENT_VERSION = "2.15"
     }
     
     private val client = OkHttpClient.Builder()
@@ -197,6 +197,15 @@ class OpenClawWebSocket(
     private fun handleMessage(text: String) {
         try {
             val json = JsonParser.parseString(text).asJsonObject
+            
+            // Gateway sends events directly as { "event": "...", ... }
+            // Check for this format first
+            if (json.has("event") && !json.has("type")) {
+                handleEvent(json)
+                return
+            }
+            
+            // Wrapped format: { "type": "event"|"res", ... }
             val type = json.get("type")?.asString ?: return
             
             when (type) {
