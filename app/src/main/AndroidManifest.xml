@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Package visibility for Android Auto -->
-    <queries>
-        <package android:name="com.google.android.projection.gearhead"/>
-    </queries>
-
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -28,23 +23,25 @@
         android:theme="@style/Theme.MyMateAuto"
         android:networkSecurityConfig="@xml/network_security_config">
         
-        <!-- Android Auto metadata -->
+        <!-- Android Auto metadata - EXACT working config -->
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc"/>
         
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="3"/>
+            android:value="1"/>
             
-        <!-- Android Auto Service -->
+        <!-- Android Auto Service - IOT category werkte! -->
         <service
             android:name=".auto.MyMateCarAppService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService"/>
-                <category android:name="androidx.car.app.category.POI"/>
             </intent-filter>
+            <meta-data
+                android:name="androidx.car.app.CarAppService.category"
+                android:value="androidx.car.app.category.IOT"/>
         </service>
         
         <!-- Background Service -->
