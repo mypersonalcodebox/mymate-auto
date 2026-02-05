@@ -102,7 +102,8 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
         // Add new memory via voice
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🎤 Nieuwe memory toevoegen")
+                .setTitle("➕ Nieuwe notitie")
+                .addText("Tik om een notitie toe te voegen")
                 .setOnClickListener {
                     screenManager.push(
                         VoiceInputScreen(carContext, "add_memory") { text ->

@@ -87,29 +87,14 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // ========== HOOFDMENU - ZELFDE ALS TELEFOON APP ==========
+        // ========== HOOFDMENU - PRAAT IS DE HOOFDFUNCTIE ==========
         // Android Auto max 6 items!
         
-        // 1. Stel een vraag (voice input - primary for driving)
+        // 1. 🎤 PRAAT MET MYMATE - DE HOOFDFUNCTIE (prominent!)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🎤 Stel een vraag")
-                .addText("Spreek vrijuit")
-                .setOnClickListener {
-                    safeNavigate {
-                        VoiceInputScreen(carContext, null) { message ->
-                            sendMessage(message, null)
-                        }
-                    }
-                }
-                .build()
-        )
-        
-        // 2. Gesprek (conversation with context)
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("💬 Gesprek")
-                .addText("Chat met context")
+                .setTitle("🎤 PRAAT MET MYMATE")
+                .addText("Start een gesprek met je AI-assistent")
                 .setBrowsable(true)
                 .setOnClickListener {
                     safeNavigate { ConversationAutoScreen(carContext) }
@@ -117,10 +102,10 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 3. Parking (save/find location)
+        // 2. 📍 Parking (save/find location)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🅿️ Parking")
+                .setTitle("📍 Parking")
                 .addText("Locatie opslaan of vinden")
                 .setBrowsable(true)
                 .setOnClickListener {
@@ -129,19 +114,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 4. Notities (memories - matches phone app)
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📝 Notities")
-                .addText("Opgeslagen herinneringen")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    safeNavigate { MemoriesAutoScreen(carContext) }
-                }
-                .build()
-        )
-        
-        // 5. Herinneringen (reminders - matches phone app)
+        // 3. ⏰ Herinneringen (reminders)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("⏰ Herinneringen")
@@ -153,11 +126,35 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 6. Instellingen (settings + extra features)
+        // 4. 📝 Notities (memories)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📝 Notities")
+                .addText("Opgeslagen herinneringen")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    safeNavigate { MemoriesAutoScreen(carContext) }
+                }
+                .build()
+        )
+        
+        // 5. 📅 Agenda
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📅 Agenda")
+                .addText("Bekijk je afspraken")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    safeNavigate { AgendaAutoScreen(carContext) }
+                }
+                .build()
+        )
+        
+        // 6. ⚙️ Instellingen
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("⚙️ Instellingen")
-                .addText("Opties en extra functies")
+                .addText("Opties en configuratie")
                 .setBrowsable(true)
                 .setOnClickListener {
                     safeNavigate { SettingsAutoScreen(carContext) }

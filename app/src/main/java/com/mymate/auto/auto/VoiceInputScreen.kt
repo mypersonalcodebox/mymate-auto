@@ -107,6 +107,15 @@ class VoiceInputScreen(
                 "💬 Bericht sturen" to "Typ of spreek je update",
                 "📨 Naar wie?" to "Specificeer de ontvanger"
             )
+            "add_memory" -> listOf(
+                "📝 Nieuwe notitie" to "Spreek of typ je notitie",
+                "💡 Tip" to "Bijv. 'Vergeet niet melk te kopen'",
+                "🏷️ Auto-categorie" to "Je notitie wordt automatisch gecategoriseerd"
+            )
+            "edit_memory" -> listOf(
+                "✏️ Bewerk notitie" to "Spreek of typ de nieuwe tekst",
+                "💡 Tip" to "De oude tekst wordt vervangen"
+            )
             else -> listOf(
                 "💡 Tip: Spreek of typ je bericht" to "Druk op de microfoon om te beginnen",
                 "🎤 Spraakinvoer" to "Houd de microfoon knop ingedrukt",
@@ -126,6 +135,8 @@ class VoiceInputScreen(
             "remind_me" -> "Waaraan moet ik je herinneren?"
             "search_info" -> "Waar zoek je naar?"
             "send_update" -> "Wat is je bericht?"
+            "add_memory" -> "Wat wil je onthouden?"
+            "edit_memory" -> "Wat is de nieuwe tekst?"
             else -> "Wat wil je vragen aan MyMate?"
         }
     }
