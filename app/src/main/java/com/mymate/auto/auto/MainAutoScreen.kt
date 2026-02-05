@@ -125,31 +125,7 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 4. Reminders
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("⏰ Herinneringen")
-                .addText("Timers en meldingen")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    safeNavigate { RemindersAutoScreen(carContext) }
-                }
-                .build()
-        )
-        
-        // 5. Morning Briefing
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🌅 Ochtend Briefing")
-                .addText("Weer, agenda & overzicht")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    safeNavigate { MorningBriefingScreen(carContext) }
-                }
-                .build()
-        )
-        
-        // 6. Agenda
+        // 4. Agenda (combined with navigation)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("📅 Agenda")
@@ -161,50 +137,19 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // ========== QUICK ACTIONS ==========
-        
-        // 7. Quick Actions menu
+        // 5. Meer... (submenu for overflow - Android Auto max 6 items!)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("⚡ Quick Actions")
-                .addText("Snelle commando's")
+                .setTitle("📂 Meer...")
+                .addText("Memories, reminders, quick actions")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    safeNavigate { QuickActionsScreen(carContext) }
+                    safeNavigate { MoreAutoScreen(carContext) }
                 }
                 .build()
         )
         
-        // 6. Vrije vraag
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🎤 Stel een vraag")
-                .addText("Spreek vrij")
-                .setOnClickListener {
-                    safeNavigate {
-                        VoiceInputScreen(carContext, null) { message ->
-                            sendMessage(message, null)
-                        }
-                    }
-                }
-                .build()
-        )
-        
-        // ========== OVERIG ==========
-        
-        // 7. Developer menu
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🛠️ Developer")
-                .addText("Taken en projecten")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    safeNavigate { DeveloperActionsScreen(carContext) }
-                }
-                .build()
-        )
-        
-        // 8. Settings
+        // 6. Settings
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("⚙️ Instellingen")

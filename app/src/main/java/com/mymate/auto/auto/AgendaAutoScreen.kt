@@ -63,14 +63,15 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
         }
         
         val listBuilder = ItemList.Builder()
+        var itemCount = 0
+        val maxItems = 6 // Android Auto limit!
         
         // Next event with location (if any)
         val nextWithLocation = CalendarHelper.getNextEvent(carContext, withLocationOnly = true)
-        if (nextWithLocation != null) {
+        if (nextWithLocation != null && itemCount < maxItems) {
             listBuilder.addItem(
                 Row.Builder()
-                    .setTitle("🧭 Volgende afspraak met locatie")
-                    .addText("${nextWithLocation.title}")
+                    .setTitle("🧭 Navigeer: ${nextWithLocation.title}")
                     .addText("📍 ${nextWithLocation.location}")
                     .setBrowsable(true)
                     .setOnClickListener {
@@ -78,24 +79,20 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                     }
                     .build()
             )
+            itemCount++
         }
         
-        // Today header
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📅 Vandaag (${todayEvents.size} afspraken)")
-                .build()
-        )
-        
-        // Today's events
-        if (todayEvents.isEmpty()) {
+        // Today's events (simplified - no header, just events)
+        if (todayEvents.isEmpty() && itemCount < maxItems) {
             listBuilder.addItem(
                 Row.Builder()
-                    .setTitle("  Geen afspraken vandaag")
+                    .setTitle("📅 Geen afspraken vandaag")
                     .build()
             )
+            itemCount++
         } else {
-            todayEvents.take(4).forEach { event ->
+            todayEvents.take(maxItems - itemCount).forEach { event ->
+                if (itemCount >= maxItems) return@forEach
                 val locationIcon = if (event.hasLocation()) "📍" else ""
                 listBuilder.addItem(
                     Row.Builder()
@@ -109,22 +106,18 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                         }
                         .build()
                 )
+                itemCount++
             }
         }
         
-        // Tomorrow header
-        if (tomorrowEvents.isNotEmpty()) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("📆 Morgen (${tomorrowEvents.size} afspraken)")
-                    .build()
-            )
-            
-            tomorrowEvents.take(2).forEach { event ->
+        // Tomorrow events (only if space left)
+        if (tomorrowEvents.isNotEmpty() && itemCount < maxItems) {
+            tomorrowEvents.take(maxItems - itemCount).forEach { event ->
+                if (itemCount >= maxItems) return@forEach
                 val locationIcon = if (event.hasLocation()) "📍" else ""
                 listBuilder.addItem(
                     Row.Builder()
-                        .setTitle("${event.getTimeRange()} $locationIcon")
+                        .setTitle("Morgen ${event.getTimeRange()} $locationIcon")
                         .addText(event.title)
                         .apply {
                             if (event.hasLocation()) {
@@ -134,6 +127,7 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                         }
                         .build()
                 )
+                itemCount++
             }
         }
         
