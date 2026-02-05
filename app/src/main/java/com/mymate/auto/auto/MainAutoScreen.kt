@@ -87,9 +87,25 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // ========== HOOFDFUNCTIES ==========
+        // ========== HOOFDMENU - ZELFDE ALS TELEFOON APP ==========
+        // Android Auto max 6 items!
         
-        // 1. Gesprek modus (Conversation)
+        // 1. Stel een vraag (voice input - primary for driving)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🎤 Stel een vraag")
+                .addText("Spreek vrijuit")
+                .setOnClickListener {
+                    safeNavigate {
+                        VoiceInputScreen(carContext, null) { message ->
+                            sendMessage(message, null)
+                        }
+                    }
+                }
+                .build()
+        )
+        
+        // 2. Gesprek (conversation with context)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("💬 Gesprek")
@@ -101,11 +117,11 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 2. Parking
+        // 3. Parking (save/find location)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🅿️ Parking")
-                .addText("Parkeerlocatie opslaan/vinden")
+                .addText("Locatie opslaan of vinden")
                 .setBrowsable(true)
                 .setOnClickListener {
                     safeNavigate { ParkingAutoScreen(carContext) }
@@ -113,11 +129,11 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 3. Memories
+        // 4. Notities (memories - matches phone app)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("📝 Memories")
-                .addText("Notities en herinneringen")
+                .setTitle("📝 Notities")
+                .addText("Opgeslagen herinneringen")
                 .setBrowsable(true)
                 .setOnClickListener {
                     safeNavigate { MemoriesAutoScreen(carContext) }
@@ -125,35 +141,23 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
-        // 4. Agenda (combined with navigation)
+        // 5. Herinneringen (reminders - matches phone app)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("📅 Agenda")
-                .addText("Afspraken & navigatie")
+                .setTitle("⏰ Herinneringen")
+                .addText("Timers en meldingen")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    safeNavigate { AgendaAutoScreen(carContext) }
+                    safeNavigate { RemindersAutoScreen(carContext) }
                 }
                 .build()
         )
         
-        // 5. Meer... (submenu for overflow - Android Auto max 6 items!)
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📂 Meer...")
-                .addText("Memories, reminders, quick actions")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    safeNavigate { MoreAutoScreen(carContext) }
-                }
-                .build()
-        )
-        
-        // 6. Settings
+        // 6. Instellingen (settings + extra features)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("⚙️ Instellingen")
-                .addText("TTS, verbinding, etc.")
+                .addText("Opties en extra functies")
                 .setBrowsable(true)
                 .setOnClickListener {
                     safeNavigate { SettingsAutoScreen(carContext) }

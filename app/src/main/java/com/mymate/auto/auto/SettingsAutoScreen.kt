@@ -16,23 +16,16 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         get() = runBlocking { preferencesManager.getTtsEnabledSync() }
         set(value) = runBlocking { preferencesManager.setTtsEnabled(value) }
     
-    private val gatewayUrl: String
-        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
-    
-    private val gatewayToken: String
-        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
-    
-    private val webhookUrl: String
-        get() = runBlocking { preferencesManager.getWebhookUrlSync() }
-    
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // TTS Toggle
+        // Android Auto max 6 items!
+        
+        // 1. TTS Toggle (essential for driving)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🔊 Tekst-naar-spraak")
-                .addText(if (ttsEnabled) "Ingeschakeld ✅" else "Uitgeschakeld ❌")
+                .addText(if (ttsEnabled) "Aan ✅" else "Uit ❌")
                 .setOnClickListener {
                     ttsEnabled = !ttsEnabled
                     invalidate()
@@ -40,102 +33,63 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Gateway URL
-        val gatewayDisplay = if (gatewayUrl.length > 40) gatewayUrl.take(40) + "..." else gatewayUrl
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🌐 Gateway URL")
-                .addText(gatewayDisplay)
-                .setOnClickListener {
-                    screenManager.push(
-                        MessageScreen(carContext, 
-                            "Gateway URL",
-                            "Huidige URL: $gatewayUrl\n\nWijzig deze instelling in de phone app."
-                        ) {
-                            screenManager.pop()
-                        }
-                    )
-                }
-                .build()
-        )
-        
-        // Gateway Token
-        val tokenDisplay = if (gatewayToken.isNotEmpty()) "••••••••" else "(niet ingesteld)"
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🔑 Gateway Token")
-                .addText(tokenDisplay)
-                .setOnClickListener {
-                    screenManager.push(
-                        MessageScreen(carContext, 
-                            "Gateway Token",
-                            if (gatewayToken.isNotEmpty()) "Token is ingesteld.\n\nWijzig in de phone app." else "Geen token ingesteld.\n\nStel in via de phone app."
-                        ) {
-                            screenManager.pop()
-                        }
-                    )
-                }
-                .build()
-        )
-        
-        // Webhook URL
-        val webhookDisplay = if (webhookUrl.length > 40) webhookUrl.take(40) + "..." else webhookUrl
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🔗 Webhook URL")
-                .addText(webhookDisplay)
-                .setOnClickListener {
-                    screenManager.push(
-                        MessageScreen(carContext, 
-                            "Webhook URL",
-                            "Huidige URL:\n$webhookUrl\n\nWijzig deze instelling in de phone app."
-                        ) {
-                            screenManager.pop()
-                        }
-                    )
-                }
-                .build()
-        )
-        
-        // Clear action history - Note: This would require a clearActionUsage method in PreferencesManager
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🗑️ Actie-geschiedenis wissen")
-                .addText("Reset quick action volgorde")
-                .setOnClickListener {
-                    screenManager.push(
-                        MessageScreen(carContext, 
-                            "ℹ️ Info",
-                            "Actie-geschiedenis wissen is beschikbaar in de phone app."
-                        ) {
-                            screenManager.pop()
-                        }
-                    )
-                }
-                .build()
-        )
-        
-        // App version
-        val version = try {
-            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName ?: "Onbekend"
-        } catch (e: Exception) {
-            "Onbekend"
-        }
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📱 App versie")
-                .addText(version)
-                .build()
-        )
-        
-        // Connection test
+        // 2. Connection Test (troubleshooting)
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🧪 Test verbinding")
-                .addText("Controleer of gateway bereikbaar is")
+                .addText("Controleer gateway")
+                .setBrowsable(true)
                 .setOnClickListener {
+                    val gatewayUrl = runBlocking { preferencesManager.getGatewayUrlSync() }
                     screenManager.push(ConnectionTestScreen(carContext, gatewayUrl))
+                }
+                .build()
+        )
+        
+        // 3. Agenda & Briefing (extra feature)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📅 Agenda & Briefing")
+                .addText("Afspraken en dagelijks overzicht")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(AgendaBriefingMenuScreen(carContext))
+                }
+                .build()
+        )
+        
+        // 4. Quick Actions (frequently used commands)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("⚡ Quick Actions")
+                .addText("Snelle commando's")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(QuickActionsScreen(carContext))
+                }
+                .build()
+        )
+        
+        // 5. Developer Tools
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🛠️ Developer")
+                .addText("Taken en projecten")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(DeveloperActionsScreen(carContext))
+                }
+                .build()
+        )
+        
+        // 6. App Info (version, gateway config)
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📱 Over MyMate")
+                .addText("Versie en configuratie")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(AppInfoScreen(carContext))
                 }
                 .build()
         )
@@ -148,6 +102,103 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
     }
 }
 
+/**
+ * Submenu for Agenda and Morning Briefing
+ */
+class AgendaBriefingMenuScreen(carContext: CarContext) : Screen(carContext) {
+    
+    override fun onGetTemplate(): Template {
+        val listBuilder = ItemList.Builder()
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📅 Agenda")
+                .addText("Vandaag en morgen")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(AgendaAutoScreen(carContext))
+                }
+                .build()
+        )
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🌅 Ochtend Briefing")
+                .addText("Weer, agenda, overzicht")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.push(MorningBriefingScreen(carContext))
+                }
+                .build()
+        )
+        
+        return ListTemplate.Builder()
+            .setTitle("📅 Agenda & Briefing")
+            .setHeaderAction(Action.BACK)
+            .setSingleList(listBuilder.build())
+            .build()
+    }
+}
+
+/**
+ * App info screen with version and gateway configuration
+ */
+class AppInfoScreen(carContext: CarContext) : Screen(carContext) {
+    
+    private val preferencesManager = PreferencesManager(carContext)
+    
+    override fun onGetTemplate(): Template {
+        val version = try {
+            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName ?: "?"
+        } catch (e: Exception) {
+            "?"
+        }
+        
+        val gatewayUrl = runBlocking { preferencesManager.getGatewayUrlSync() }
+        val webhookUrl = runBlocking { preferencesManager.getWebhookUrlSync() }
+        val hasToken = runBlocking { preferencesManager.getGatewayTokenSync().isNotEmpty() }
+        
+        val listBuilder = ItemList.Builder()
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📱 Versie")
+                .addText(version)
+                .build()
+        )
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🌐 Gateway")
+                .addText(gatewayUrl.take(45))
+                .build()
+        )
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🔑 Token")
+                .addText(if (hasToken) "Ingesteld ✅" else "Niet ingesteld ❌")
+                .build()
+        )
+        
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("ℹ️ Configuratie wijzigen")
+                .addText("Gebruik de telefoon app")
+                .build()
+        )
+        
+        return ListTemplate.Builder()
+            .setTitle("📱 Over MyMate")
+            .setHeaderAction(Action.BACK)
+            .setSingleList(listBuilder.build())
+            .build()
+    }
+}
+
+/**
+ * Connection test screen
+ */
 class ConnectionTestScreen(
     carContext: CarContext,
     private val gatewayUrl: String
@@ -168,7 +219,6 @@ class ConnectionTestScreen(
     private fun testConnection() {
         Thread {
             try {
-                // Parse host and port from URL (e.g., "ws://host:port" or "http://host:port")
                 val url = java.net.URI(gatewayUrl)
                 val host = url.host ?: throw IllegalArgumentException("Geen host in URL")
                 val port = if (url.port > 0) url.port else 18789
@@ -176,11 +226,11 @@ class ConnectionTestScreen(
                 val socket = java.net.Socket()
                 socket.connect(java.net.InetSocketAddress(host, port), 5000)
                 socket.close()
-                testStatus = "✅ Verbinding succesvol!\n\nGateway is bereikbaar op $host:$port"
+                testStatus = "✅ Verbinding OK!\n\n$host:$port bereikbaar"
                 testComplete = true
             } catch (e: Exception) {
                 Log.e(TAG, "Connection test failed", e)
-                testStatus = "❌ Verbinding mislukt\n\n${e.localizedMessage}\n\nControleer:\n• Is de gateway actief?\n• Ben je verbonden met Tailscale?\n• Is de URL correct?"
+                testStatus = "❌ Mislukt\n\n${e.localizedMessage}"
                 testComplete = true
             }
             
@@ -201,9 +251,7 @@ class ConnectionTestScreen(
             builder.addAction(
                 Action.Builder()
                     .setTitle("OK")
-                    .setOnClickListener {
-                        screenManager.pop()
-                    }
+                    .setOnClickListener { screenManager.pop() }
                     .build()
             )
             
