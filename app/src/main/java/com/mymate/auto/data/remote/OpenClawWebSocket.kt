@@ -69,6 +69,9 @@ class OpenClawWebSocket(
     private val _agentEvents = MutableSharedFlow<AgentEvent>()
     val agentEvents: SharedFlow<AgentEvent> = _agentEvents
     
+    private val _connectionErrors = MutableSharedFlow<ConnectionError>(replay = 1)
+    val connectionErrors: SharedFlow<ConnectionError> = _connectionErrors
+    
     private val isConnected = AtomicBoolean(false)
     @Volatile
     private var sessionKey: String = "agent:main:main"
@@ -81,6 +84,17 @@ class OpenClawWebSocket(
         RECONNECTING,
         ERROR
     }
+    
+    /**
+     * Connection error details for UI display
+     */
+    data class ConnectionError(
+        val code: Int?,
+        val reason: String,
+        val userMessage: String,
+        val isAuthError: Boolean,
+        val isRecoverable: Boolean
+    )
     
     data class ChatResponse(
         val sessionKey: String,

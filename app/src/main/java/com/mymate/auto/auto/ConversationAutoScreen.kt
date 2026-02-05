@@ -242,6 +242,18 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
             override fun onResponse(call: Call, response: Response) {
                 Log.d(TAG, "Got response: ${response.code}")
                 
+                if (!response.isSuccessful) {
+                    val errorMsg = when (response.code) {
+                        401 -> "❌ Authenticatie mislukt - controleer je token in Instellingen"
+                        403 -> "❌ Geen toegang - controleer je configuratie"
+                        404 -> "❌ Gateway niet gevonden"
+                        500, 502, 503 -> "❌ Server fout - probeer later opnieuw"
+                        else -> "❌ Fout: HTTP ${response.code}"
+                    }
+                    handleResponse(errorMsg)
+                    return
+                }
+                
                 val responseText = try {
                     response.body?.use { body ->
                         val responseBody = body.string()

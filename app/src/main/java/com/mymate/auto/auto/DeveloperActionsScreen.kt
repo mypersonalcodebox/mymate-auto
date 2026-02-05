@@ -201,6 +201,19 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
             override fun onResponse(call: Call, response: Response) {
                 Log.d(TAG, "Got response: ${response.code}")
                 
+                if (!response.isSuccessful) {
+                    val errorMsg = when (response.code) {
+                        401 -> "❌ Token onjuist - controleer Instellingen"
+                        403 -> "❌ Geen toegang"
+                        404 -> "❌ Webhook niet gevonden"
+                        500, 502, 503 -> "❌ Server fout - probeer later"
+                        else -> "❌ Fout: HTTP ${response.code}"
+                    }
+                    Log.e(TAG, "HTTP error: ${response.code}")
+                    handleResponse(errorMsg)
+                    return
+                }
+                
                 val responseText = try {
                     response.body?.use { body ->
                         val responseBody = body.string()
