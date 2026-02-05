@@ -150,17 +150,25 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
     
     fun saveConfiguration() {
         viewModelScope.launch {
-            preferencesManager.setGatewayUrl(_uiState.value.gatewayUrl)
-            preferencesManager.setGatewayToken(_uiState.value.authToken)
-            preferencesManager.setIsConfigured(true)
-            
-            // Also update webhook URL to match
-            val webhookUrl = _uiState.value.gatewayUrl
-                .replace("ws://", "http://")
-                .replace("wss://", "https://")
-                .trimEnd('/') + "/hooks/agent"
-            preferencesManager.setWebhookUrl(webhookUrl)
+            saveConfigurationInternal()
         }
+    }
+    
+    suspend fun saveConfigurationAndWait() {
+        saveConfigurationInternal()
+    }
+    
+    private suspend fun saveConfigurationInternal() {
+        preferencesManager.setGatewayUrl(_uiState.value.gatewayUrl)
+        preferencesManager.setGatewayToken(_uiState.value.authToken)
+        preferencesManager.setIsConfigured(true)
+        
+        // Also update webhook URL to match
+        val webhookUrl = _uiState.value.gatewayUrl
+            .replace("ws://", "http://")
+            .replace("wss://", "https://")
+            .trimEnd('/') + "/hooks/agent"
+        preferencesManager.setWebhookUrl(webhookUrl)
     }
     
     private data class TestResult(

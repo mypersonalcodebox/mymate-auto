@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -211,20 +212,38 @@ fun SetupScreen(
             Spacer(modifier = Modifier.height(12.dp))
             
             // Save button
+            var isSaving by remember { mutableStateOf(false) }
+            val coroutineScope = rememberCoroutineScope()
+            
             Button(
                 onClick = { 
-                    viewModel.saveConfiguration()
-                    onSetupComplete()
+                    isSaving = true
+                    coroutineScope.launch {
+                        try {
+                            viewModel.saveConfigurationAndWait()
+                            onSetupComplete()
+                        } catch (e: Exception) {
+                            isSaving = false
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS,
+                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS && !isSaving,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryBlue
                 )
             ) {
-                Icon(Icons.Default.Save, contentDescription = null)
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Default.Save, contentDescription = null)
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Opslaan en Starten")
+                Text(if (isSaving) "Opslaan..." else "Opslaan en Starten")
             }
             
             Spacer(modifier = Modifier.height(32.dp))
