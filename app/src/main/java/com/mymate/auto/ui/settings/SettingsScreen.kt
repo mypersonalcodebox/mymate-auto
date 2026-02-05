@@ -169,6 +169,22 @@ fun SettingsScreen(
                     checked = uiState.notificationsEnabled,
                     onCheckedChange = { viewModel.setNotificationsEnabled(it) }
                 )
+                
+                SettingsSwitch(
+                    icon = Icons.Default.DirectionsCar,
+                    title = "Auto-save Parking",
+                    subtitle = "Sla locatie op bij Bluetooth disconnect",
+                    checked = uiState.autoSaveParking,
+                    onCheckedChange = { viewModel.setAutoSaveParking(it) }
+                )
+                
+                SettingsSwitch(
+                    icon = Icons.Default.Mic,
+                    title = "\"Hey MyMate\" Wake Word",
+                    subtitle = "Luister naar wake word (batterij-intensief)",
+                    checked = uiState.wakeWordEnabled,
+                    onCheckedChange = { viewModel.setWakeWordEnabled(it) }
+                )
             }
             
             Divider(modifier = Modifier.padding(vertical = 8.dp))

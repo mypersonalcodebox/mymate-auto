@@ -137,9 +137,33 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
                 .build()
         )
         
+        // 5. Morning Briefing
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("🌅 Ochtend Briefing")
+                .addText("Weer, agenda & overzicht")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    safeNavigate { MorningBriefingScreen(carContext) }
+                }
+                .build()
+        )
+        
+        // 6. Agenda
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📅 Agenda")
+                .addText("Afspraken & navigatie")
+                .setBrowsable(true)
+                .setOnClickListener {
+                    safeNavigate { AgendaAutoScreen(carContext) }
+                }
+                .build()
+        )
+        
         // ========== QUICK ACTIONS ==========
         
-        // 5. Quick Actions menu
+        // 7. Quick Actions menu
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("⚡ Quick Actions")

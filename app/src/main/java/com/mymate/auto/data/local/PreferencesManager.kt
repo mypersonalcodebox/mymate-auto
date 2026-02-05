@@ -40,6 +40,9 @@ class PreferencesManager(private val context: Context) {
         val SEND_PARKING_TO_TELEGRAM = booleanPreferencesKey("send_parking_to_telegram")
         val PARKING_RETENTION_DAYS = intPreferencesKey("parking_retention_days")
         
+        // Wake word
+        val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
+        
         // Default credentials - keep for personal use, new users will configure via setup
         const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
         const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
@@ -98,6 +101,26 @@ class PreferencesManager(private val context: Context) {
     
     val appLanguage: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[APP_LANGUAGE] ?: DEFAULT_LANGUAGE
+    }
+    
+    val autoSaveParking: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[AUTO_SAVE_PARKING] ?: false // Default off - user must enable
+    }
+    
+    val wakeWordEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[WAKE_WORD_ENABLED] ?: false // Default off - battery intensive
+    }
+    
+    suspend fun setAutoSaveParking(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[AUTO_SAVE_PARKING] = enabled
+        }
+    }
+    
+    suspend fun setWakeWordEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[WAKE_WORD_ENABLED] = enabled
+        }
     }
     
     suspend fun setWebhookUrl(url: String) {

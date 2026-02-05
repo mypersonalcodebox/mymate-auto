@@ -15,9 +15,10 @@ import com.mymate.auto.data.model.*
         ConversationMessage::class,
         ParkingLocation::class,
         Reminder::class,
-        Memory::class
+        Memory::class,
+        Trip::class
     ], 
-    version = 4, 
+    version = 5, 
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -27,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun parkingDao(): ParkingDao
     abstract fun reminderDao(): ReminderDao
     abstract fun memoryDao(): MemoryDao
+    abstract fun tripDao(): TripDao
     
     companion object {
         @Volatile
@@ -113,6 +115,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         
+        // Migration from v4 to v5 - add trips table for ride tracking
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS trips (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        startTime INTEGER NOT NULL,
+                        endTime INTEGER,
+                        durationMinutes INTEGER,
+                        startAddress TEXT,
+                        endAddress TEXT,
+                        isActive INTEGER NOT NULL DEFAULT 1
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_trips_startTime ON trips(startTime)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_trips_endTime ON trips(endTime)")
+            }
+        }
+        
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -120,7 +141,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mymate_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // No fallbackToDestructiveMigration - we handle all migrations explicitly
                     .build()
                 INSTANCE = instance

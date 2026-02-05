@@ -82,6 +82,20 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         
         val listBuilder = ItemList.Builder()
         
+        // Walk to car button (only show if we have a saved location)
+        val latestParking = parkingLocations.firstOrNull()
+        if (latestParking != null) {
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("🚶 Loop naar m'n auto")
+                    .addText(latestParking.address?.take(35) ?: "Navigeer naar je auto")
+                    .setOnClickListener {
+                        navigateWalkingToLocation(latestParking)
+                    }
+                    .build()
+            )
+        }
+        
         // Save current location button
         listBuilder.addItem(
             Row.Builder()
@@ -222,6 +236,29 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         screenManager.push(ParkingDetailScreen(carContext, location, parkingDao, scope) {
             loadParkingLocations()
         })
+    }
+    
+    private fun navigateWalkingToLocation(location: ParkingLocation) {
+        try {
+            // Walking navigation to car location
+            val uri = Uri.parse("google.navigation:q=${location.latitude},${location.longitude}&mode=w")
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage("com.google.android.apps.maps")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            carContext.startCarApp(intent)
+        } catch (e: Exception) {
+            // Fallback to geo URI
+            try {
+                val uri = Uri.parse("geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}(Mijn auto)")
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                carContext.startCarApp(intent)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Walking navigation failed", e2)
+            }
+        }
     }
     
     private fun getTimeAgo(timestamp: Long): String {

@@ -34,7 +34,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     
     init {
-        // Collect all preferences
+        // Collect all preferences - split into two combines due to 11 param limit
         viewModelScope.launch {
             combine(
                 preferencesManager.webhookUrl,
@@ -42,31 +42,69 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 preferencesManager.notificationsEnabled,
                 preferencesManager.webSocketEnabled,
                 preferencesManager.darkMode,
-                preferencesManager.autoReconnect,
-                preferencesManager.gatewayUrl,
-                preferencesManager.gatewayToken,
-                preferencesManager.useOpenClawWebSocket,
-                preferencesManager.sessionKey,
-                preferencesManager.appLanguage
-            ) { values ->
+                preferencesManager.autoReconnect
+            ) { webhookUrl, ttsEnabled, notificationsEnabled, webSocketEnabled, darkMode, autoReconnect ->
+                PartialState1(webhookUrl, ttsEnabled, notificationsEnabled, webSocketEnabled, darkMode, autoReconnect)
+            }.combine(
+                combine(
+                    preferencesManager.gatewayUrl,
+                    preferencesManager.gatewayToken,
+                    preferencesManager.useOpenClawWebSocket,
+                    preferencesManager.sessionKey,
+                    preferencesManager.appLanguage,
+                    preferencesManager.autoSaveParking,
+                    preferencesManager.wakeWordEnabled
+                ) { values ->
+                    PartialState2(
+                        gatewayUrl = values[0] as String,
+                        gatewayToken = values[1] as? String,
+                        useOpenClawWebSocket = values[2] as Boolean,
+                        sessionKey = values[3] as String,
+                        appLanguage = values[4] as String,
+                        autoSaveParking = values[5] as Boolean,
+                        wakeWordEnabled = values[6] as Boolean
+                    )
+                }
+            ) { p1, p2 ->
                 SettingsUiState(
-                    webhookUrl = values[0] as String,
-                    ttsEnabled = values[1] as Boolean,
-                    notificationsEnabled = values[2] as Boolean,
-                    webSocketEnabled = values[3] as Boolean,
-                    darkMode = values[4] as Boolean,
-                    autoReconnect = values[5] as Boolean,
-                    gatewayUrl = values[6] as String,
-                    gatewayToken = values[7] as? String,
-                    useOpenClawWebSocket = values[8] as Boolean,
-                    sessionKey = values[9] as String,
-                    appLanguage = values[10] as String
+                    webhookUrl = p1.webhookUrl,
+                    ttsEnabled = p1.ttsEnabled,
+                    notificationsEnabled = p1.notificationsEnabled,
+                    webSocketEnabled = p1.webSocketEnabled,
+                    darkMode = p1.darkMode,
+                    autoReconnect = p1.autoReconnect,
+                    gatewayUrl = p2.gatewayUrl,
+                    gatewayToken = p2.gatewayToken,
+                    useOpenClawWebSocket = p2.useOpenClawWebSocket,
+                    sessionKey = p2.sessionKey,
+                    appLanguage = p2.appLanguage,
+                    autoSaveParking = p2.autoSaveParking,
+                    wakeWordEnabled = p2.wakeWordEnabled
                 )
             }.collect { state ->
                 _uiState.value = state
             }
         }
     }
+    
+    private data class PartialState1(
+        val webhookUrl: String,
+        val ttsEnabled: Boolean,
+        val notificationsEnabled: Boolean,
+        val webSocketEnabled: Boolean,
+        val darkMode: Boolean,
+        val autoReconnect: Boolean
+    )
+    
+    private data class PartialState2(
+        val gatewayUrl: String,
+        val gatewayToken: String?,
+        val useOpenClawWebSocket: Boolean,
+        val sessionKey: String,
+        val appLanguage: String,
+        val autoSaveParking: Boolean,
+        val wakeWordEnabled: Boolean
+    )
     
     fun setWebhookUrl(url: String) {
         viewModelScope.launch {
@@ -133,6 +171,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAppLanguage(language: String) {
         viewModelScope.launch {
             preferencesManager.setAppLanguage(language)
+        }
+    }
+    
+    fun setAutoSaveParking(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoSaveParking(enabled)
+        }
+    }
+    
+    fun setWakeWordEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setWakeWordEnabled(enabled)
         }
     }
     
@@ -323,7 +373,11 @@ data class SettingsUiState(
     val useOpenClawWebSocket: Boolean = true,
     val sessionKey: String = PreferencesManager.DEFAULT_SESSION_KEY,
     // Language setting
-    val appLanguage: String = PreferencesManager.DEFAULT_LANGUAGE
+    val appLanguage: String = PreferencesManager.DEFAULT_LANGUAGE,
+    // Bluetooth parking auto-save
+    val autoSaveParking: Boolean = false,
+    // Wake word detection
+    val wakeWordEnabled: Boolean = false
 )
 
 sealed class ConnectionTestState {

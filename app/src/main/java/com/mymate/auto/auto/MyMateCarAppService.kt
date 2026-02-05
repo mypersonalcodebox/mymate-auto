@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.mymate.auto.data.local.PreferencesManager
+import com.mymate.auto.service.TripTracker
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -45,10 +46,19 @@ class MyMateSession : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
         Log.d(TAG, "Android Auto session started")
         
+        // Start trip tracking when Android Auto connects
+        val tripTracker = TripTracker.getInstance(carContext)
+        tripTracker.startTrip()
+        Log.d(TAG, "Trip tracking started")
+        
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
-                Log.d(TAG, "Android Auto session ending - sending parking location")
+                Log.d(TAG, "Android Auto session ending - sending parking location and ending trip")
                 isDestroyed.set(true)
+                
+                // End trip tracking when Android Auto disconnects
+                tripTracker.endTrip()
+                Log.d(TAG, "Trip tracking ended")
                 
                 // Send parking location in background, but don't block
                 executor.submit {
