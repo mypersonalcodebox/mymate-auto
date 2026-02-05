@@ -120,6 +120,10 @@ class VoiceInputScreen(
                 "✏️ Bewerk notitie" to "Spreek of typ de nieuwe tekst",
                 "💡 Tip" to "De oude tekst wordt vervangen"
             )
+            "dev_command" -> listOf(
+                "🛠️ Dev opdracht" to "Bijv. 'Check status van mijn taken'",
+                "💡 Of vraag" to "Bijv. 'Maak een GitHub issue voor de login bug'"
+            )
             else -> listOf(
                 "💡 Tip: Spreek of typ je bericht" to "Druk op de microfoon om te beginnen",
                 "🎤 Spraakinvoer" to "Houd de microfoon knop ingedrukt",
@@ -142,6 +146,7 @@ class VoiceInputScreen(
             "send_update" -> "Wat is je bericht?"
             "add_memory" -> "Wat wil je onthouden?"
             "edit_memory" -> "Wat is de nieuwe tekst?"
+            "dev_command" -> "Wat is je dev opdracht?"
             else -> "Wat wil je vragen aan MyMate?"
         }
     }
