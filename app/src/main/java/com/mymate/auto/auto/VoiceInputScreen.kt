@@ -103,6 +103,15 @@ class VoiceInputScreen(
                 "⏰ Herinnering instellen" to "Bijv. 'Over 2 uur bellen met Jan'",
                 "📅 Met datum" to "Bijv. 'Morgen om 9 uur meeting'"
             )
+            "reminder_quick" -> listOf(
+                "🎤 Spreek je herinnering in" to "Bijv. 'Boodschappen doen'",
+                "💡 Kort en bondig" to "De tijd is al ingesteld"
+            )
+            "reminder_custom" -> listOf(
+                "⏰ Tijd opgeven" to "Bijv. 'Over 30 minuten afspraak'",
+                "📅 Morgen/vanavond" to "Bijv. 'Morgen Jan bellen'",
+                "💡 Of alleen beschrijving" to "Standaard: over 30 minuten"
+            )
             "search_info" -> listOf(
                 "🔍 Zoeken" to "Stel je vraag",
                 "📚 Documentatie" to "Zoek in je projecten"
@@ -141,7 +150,7 @@ class VoiceInputScreen(
             "project_update" -> "Wat is de update?"
             "dev_idea" -> "Beschrijf je idee..."
             "quick_note" -> "Wat wil je noteren?"
-            "remind_me" -> "Waaraan moet ik je herinneren?"
+            "remind_me", "reminder_quick", "reminder_custom" -> "Waaraan moet ik je herinneren?"
             "search_info" -> "Waar zoek je naar?"
             "send_update" -> "Wat is je bericht?"
             "add_memory" -> "Wat wil je onthouden?"
