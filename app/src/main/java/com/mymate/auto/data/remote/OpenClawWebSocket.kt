@@ -656,6 +656,87 @@ class OpenClawWebSocket(
         sessionKey = key
     }
     
+    /**
+     * Parse WebSocket close code and return (userMessage, isAuthError, isRecoverable)
+     * 
+     * Standard close codes:
+     * - 1000: Normal closure
+     * - 1001: Going away (server shutting down)
+     * - 1002: Protocol error
+     * - 1003: Unsupported data
+     * - 1006: Abnormal closure (connection lost)
+     * - 1007: Invalid frame payload
+     * - 1008: Policy violation (often used for auth failures)
+     * - 1009: Message too big
+     * - 1010: Missing extension
+     * - 1011: Internal server error
+     * - 1012: Service restart
+     * - 1013: Try again later
+     * - 1014: Bad gateway
+     * - 1015: TLS handshake failure
+     * - 3000-3999: Reserved for libraries/frameworks
+     * - 4000-4999: Reserved for applications (OpenClaw uses these)
+     */
+    private fun parseCloseCode(code: Int, reason: String): Triple<String, Boolean, Boolean> {
+        // Check reason string for auth hints
+        val reasonLower = reason.lowercase()
+        val reasonHintsAuth = reasonLower.contains("auth") || 
+                              reasonLower.contains("token") || 
+                              reasonLower.contains("unauthorized") ||
+                              reasonLower.contains("forbidden") ||
+                              reasonLower.contains("invalid")
+        
+        return when (code) {
+            1000 -> Triple("Verbinding gesloten", false, true)
+            1001 -> Triple("Server wordt herstart", false, true)
+            1002 -> Triple("Protocol fout", false, false)
+            1003 -> Triple("Niet-ondersteund data type", false, false)
+            1006 -> Triple("Verbinding verloren", false, true)
+            1007 -> Triple("Ongeldige data ontvangen", false, false)
+            1008 -> {
+                // Policy violation - usually auth related
+                val msg = if (reasonHintsAuth || reason.isEmpty()) {
+                    "Token onjuist of geen toegang"
+                } else {
+                    "Toegang geweigerd: $reason"
+                }
+                Triple(msg, true, false)
+            }
+            1009 -> Triple("Bericht te groot", false, false)
+            1010 -> Triple("Server configuratie fout", false, false)
+            1011 -> Triple("Server fout", false, true)
+            1012 -> Triple("Server herstart", false, true)
+            1013 -> Triple("Server overbelast, probeer later", false, true)
+            1014 -> Triple("Gateway fout", false, true)
+            1015 -> Triple("TLS/SSL fout", false, false)
+            
+            // OpenClaw custom codes (4000-4999 range)
+            4001 -> Triple("Token onjuist", true, false)
+            4002 -> Triple("Token verlopen", true, false)
+            4003 -> Triple("Geen toegang", true, false)
+            in 4000..4099 -> {
+                // Assume 4000-4099 are auth-related
+                val msg = reason.ifEmpty { "Authenticatie fout" }
+                Triple(msg, true, false)
+            }
+            in 4100..4999 -> {
+                // Other application errors
+                val msg = reason.ifEmpty { "Applicatie fout ($code)" }
+                Triple(msg, false, false)
+            }
+            
+            else -> {
+                // Unknown code - check if reason hints at auth
+                if (reasonHintsAuth) {
+                    Triple("Token onjuist: $reason", true, false)
+                } else {
+                    val msg = reason.ifEmpty { "Onbekende fout ($code)" }
+                    Triple(msg, false, code in listOf(1001, 1006, 1011, 1012, 1013))
+                }
+            }
+        }
+    }
+    
     // Helper to build JSON objects
     private fun buildJsonObject(builder: JsonObjectBuilder.() -> Unit): JsonObject {
         return JsonObjectBuilder().apply(builder).build()

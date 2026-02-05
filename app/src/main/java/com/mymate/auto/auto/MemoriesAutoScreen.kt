@@ -49,6 +49,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     private fun loadMemories() {
         scope.launch {
             try {
+                loadError = null
                 memories = if (selectedCategory != null) {
                     memoryDao.getMemoriesByCategory(selectedCategory!!)
                 } else {
@@ -61,6 +62,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading memories", e)
+                loadError = "Kon memories niet laden"
                 isLoading = false
                 withContext(Dispatchers.Main) {
                     invalidate()

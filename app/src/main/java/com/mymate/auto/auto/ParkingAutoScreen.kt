@@ -46,6 +46,9 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     @Volatile
     private var statusMessage: String? = null
     
+    @Volatile
+    private var loadError: String? = null
+    
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
