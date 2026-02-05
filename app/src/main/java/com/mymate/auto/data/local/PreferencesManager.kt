@@ -103,18 +103,8 @@ class PreferencesManager(private val context: Context) {
         prefs[APP_LANGUAGE] ?: DEFAULT_LANGUAGE
     }
     
-    val autoSaveParking: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[AUTO_SAVE_PARKING] ?: false // Default off - user must enable
-    }
-    
     val wakeWordEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[WAKE_WORD_ENABLED] ?: false // Default off - battery intensive
-    }
-    
-    suspend fun setAutoSaveParking(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[AUTO_SAVE_PARKING] = enabled
-        }
     }
     
     suspend fun setWakeWordEnabled(enabled: Boolean) {

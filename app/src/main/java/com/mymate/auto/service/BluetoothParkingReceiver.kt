@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.location.Location
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
@@ -18,6 +19,9 @@ import com.mymate.auto.data.model.ParkingLocation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * BroadcastReceiver that auto-saves parking location when Bluetooth disconnects.
@@ -56,21 +60,8 @@ class BluetoothParkingReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
-                // Get current location
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                val cancellationToken = CancellationTokenSource()
-                
-                val location = try {
-                    kotlinx.coroutines.tasks.await(
-                        fusedLocationClient.getCurrentLocation(
-                            Priority.PRIORITY_HIGH_ACCURACY,
-                            cancellationToken.token
-                        )
-                    )
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to get location", e)
-                    null
-                }
+                // Get current location using suspendCoroutine
+                val location = getLocation(context)
                 
                 if (location == null) {
                     Log.w(TAG, "Could not get location")
@@ -112,6 +103,27 @@ class BluetoothParkingReceiver : BroadcastReceiver() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error in Bluetooth parking receiver", e)
             }
+        }
+    }
+    
+    @Suppress("MissingPermission")
+    private suspend fun getLocation(context: Context): Location? = suspendCoroutine { continuation ->
+        try {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            val cancellationToken = CancellationTokenSource()
+            
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                cancellationToken.token
+            ).addOnSuccessListener { location ->
+                continuation.resume(location)
+            }.addOnFailureListener { exception ->
+                Log.e(TAG, "Failed to get location", exception)
+                continuation.resume(null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting location", e)
+            continuation.resume(null)
         }
     }
 }
