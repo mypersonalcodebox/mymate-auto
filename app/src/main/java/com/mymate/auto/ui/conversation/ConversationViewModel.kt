@@ -9,6 +9,7 @@ import com.mymate.auto.data.model.ConversationMessage
 import com.mymate.auto.data.remote.MyMateApiClient
 import com.mymate.auto.data.remote.OpenClawWebSocket
 import com.mymate.auto.data.repository.ConversationRepository
+import com.mymate.auto.util.NetworkUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -92,10 +93,18 @@ class ConversationViewModel(application: Application) : AndroidViewModel(applica
                     }
                 },
                 onFailure = { error ->
+                    // Parse error type and get user-friendly message
+                    val networkError = NetworkUtils.parseError(error)
+                    val errorMessage = NetworkUtils.getErrorMessage(getApplication(), networkError)
+                    val isAuthError = networkError is NetworkUtils.NetworkError.AuthFailed
+                    val isRetryable = NetworkUtils.isRetryable(networkError)
+                    
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
-                            error = error.localizedMessage ?: "Onbekende fout"
+                            error = errorMessage,
+                            isAuthError = isAuthError,
+                            isRetryable = isRetryable
                         )
                     }
                 }
@@ -153,7 +162,7 @@ class ConversationViewModel(application: Application) : AndroidViewModel(applica
     }
     
     fun clearError() {
-        _uiState.update { it.copy(error = null) }
+        _uiState.update { it.copy(error = null, isAuthError = false, isRetryable = false) }
     }
     
     fun reconnectWebSocket() {
@@ -169,6 +178,8 @@ class ConversationViewModel(application: Application) : AndroidViewModel(applica
 data class ConversationUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
+    val isAuthError: Boolean = false,
+    val isRetryable: Boolean = false,
     val connectionStatus: String = "Niet verbonden",
     val messageCount: Int = 0
 )
