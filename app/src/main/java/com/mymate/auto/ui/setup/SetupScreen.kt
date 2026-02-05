@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +31,8 @@ fun SetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showToken by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     
     Scaffold(
         topBar = {
@@ -210,22 +213,36 @@ fun SetupScreen(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Save button - simple synchronous save
+            // Save button - awaits save before navigating
             Button(
                 onClick = { 
-                    viewModel.saveConfiguration()
-                    // Small delay then navigate
-                    onSetupComplete()
+                    if (!isSaving) {
+                        isSaving = true
+                        coroutineScope.launch {
+                            viewModel.saveConfigurationAndWait()
+                            onSetupComplete()
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS,
+                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS && !isSaving,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryBlue
                 )
             ) {
-                Icon(Icons.Default.Save, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Opslaan en Starten")
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Opslaan...")
+                } else {
+                    Icon(Icons.Default.Save, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Opslaan en Starten")
+                }
             }
             
             Spacer(modifier = Modifier.height(32.dp))
