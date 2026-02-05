@@ -128,7 +128,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                         .setTitle("$emoji $preview")
                         .addText("$date • ${memory.category.name}")
                         .setOnClickListener {
-                            screenManager.push(MemoryDetailAutoScreen(carContext, memory, memoryDao, scope) {
+                            screenManager.push(MemoryDetailAutoScreen(carContext, memory, memoryDao) {
                                 loadMemories()
                             })
                         }
@@ -263,7 +263,6 @@ class MemoryDetailAutoScreen(
     carContext: CarContext,
     private val memory: Memory,
     private val memoryDao: com.mymate.auto.data.local.MemoryDao,
-    parentScope: CoroutineScope,
     private val onDeleted: () -> Unit
 ) : Screen(carContext) {
     
@@ -328,6 +327,20 @@ class MemoryDetailAutoScreen(
             )
         }
         
+        // Edit button
+        paneBuilder.addAction(
+            Action.Builder()
+                .setTitle("✏️ Bewerk")
+                .setOnClickListener {
+                    screenManager.push(
+                        VoiceInputScreen(carContext, "edit_memory") { newContent ->
+                            updateMemory(newContent)
+                        }
+                    )
+                }
+                .build()
+        )
+        
         // Delete button
         paneBuilder.addAction(
             Action.Builder()
@@ -349,6 +362,20 @@ class MemoryDetailAutoScreen(
             memoryDao.deleteMemory(memory)
             withContext(Dispatchers.Main) {
                 onDeleted()
+                screenManager.pop()
+            }
+        }
+    }
+    
+    private fun updateMemory(newContent: String) {
+        scope.launch {
+            val updatedMemory = memory.copy(
+                content = newContent,
+                updatedAt = System.currentTimeMillis()
+            )
+            memoryDao.update(updatedMemory)
+            withContext(Dispatchers.Main) {
+                onDeleted() // Refresh the list
                 screenManager.pop()
             }
         }

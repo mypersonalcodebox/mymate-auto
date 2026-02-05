@@ -43,6 +43,10 @@ class MorningBriefingScreen(carContext: CarContext) : Screen(carContext) {
     @Volatile
     private var greeting: String = "Goedemorgen!"
     
+    // Cached calendar events to avoid fetching twice
+    @Volatile
+    private var cachedEvents: List<CalendarHelper.CalendarEvent> = emptyList()
+    
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -90,21 +94,22 @@ class MorningBriefingScreen(carContext: CarContext) : Screen(carContext) {
                 weatherText = "❌ Weer niet beschikbaar"
             }
             
-            // Load agenda
+            // Load agenda and cache events for speakBriefing
             try {
-                val events = CalendarHelper.getTodayEvents(carContext)
-                agendaText = if (events.isEmpty()) {
+                cachedEvents = CalendarHelper.getTodayEvents(carContext)
+                agendaText = if (cachedEvents.isEmpty()) {
                     "📅 Geen afspraken vandaag"
                 } else {
-                    val eventList = events.take(3).joinToString("\n") { event ->
+                    val eventList = cachedEvents.take(3).joinToString("\n") { event ->
                         "• ${event.getTimeRange()}: ${event.title}"
                     }
-                    val more = if (events.size > 3) "\n  +${events.size - 3} meer" else ""
-                    "📅 ${events.size} afspraak(en):\n$eventList$more"
+                    val more = if (cachedEvents.size > 3) "\n  +${cachedEvents.size - 3} meer" else ""
+                    "📅 ${cachedEvents.size} afspraak(en):\n$eventList$more"
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Agenda load failed", e)
                 agendaText = "📅 Agenda niet beschikbaar"
+                cachedEvents = emptyList()
             }
             
             isLoading = false
@@ -122,9 +127,12 @@ class MorningBriefingScreen(carContext: CarContext) : Screen(carContext) {
         }
     }
     
-    private fun fetchWeather(): String {
+    private suspend fun fetchWeather(): String {
+        // Get weather location from preferences, default to Amsterdam
+        val location = prefs.getWeatherLocationSync()
+        
         val request = Request.Builder()
-            .url("https://wttr.in/Amsterdam?format=%c+%t+%w&lang=nl")
+            .url("https://wttr.in/$location?format=%c+%t+%w&lang=nl")
             .header("User-Agent", "MyMate-Auto/2.39")
             .build()
         
@@ -150,12 +158,12 @@ class MorningBriefingScreen(carContext: CarContext) : Screen(carContext) {
             append(weatherText.replace(Regex("[🌤️❌]"), "").trim())
             append(". ")
             
-            val events = CalendarHelper.getTodayEvents(carContext)
-            if (events.isEmpty()) {
+            // Use cached events instead of fetching again
+            if (cachedEvents.isEmpty()) {
                 append("Je hebt geen afspraken vandaag.")
             } else {
-                append("Je hebt ${events.size} afspraak${if (events.size > 1) "en" else ""} vandaag. ")
-                events.firstOrNull()?.let { first ->
+                append("Je hebt ${cachedEvents.size} afspraak${if (cachedEvents.size > 1) "en" else ""} vandaag. ")
+                cachedEvents.firstOrNull()?.let { first ->
                     append("De eerste is ${first.title} om ${first.getTimeRange()}.")
                 }
             }

@@ -39,6 +39,8 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
+    // runBlocking is acceptable here - these getters are only called from OkHttp's
+    // background callback threads (onResponse/onFailure), never from the main thread
     private val gatewayUrl: String
         get() = runBlocking { preferencesManager.getGatewayUrlSync() }
     private val gatewayToken: String

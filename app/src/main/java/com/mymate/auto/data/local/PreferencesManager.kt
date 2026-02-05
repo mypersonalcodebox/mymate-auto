@@ -43,6 +43,10 @@ class PreferencesManager(private val context: Context) {
         // Wake word
         val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
         
+        // Weather location
+        val WEATHER_LOCATION = stringPreferencesKey("weather_location")
+        const val DEFAULT_WEATHER_LOCATION = "Amsterdam"
+        
         // Default credentials - keep for personal use, new users will configure via setup
         const val DEFAULT_WEBHOOK_URL = "http://100.124.24.27:18789/hooks/agent"
         const val DEFAULT_GATEWAY_URL = "ws://100.124.24.27:18789"
@@ -111,6 +115,21 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[WAKE_WORD_ENABLED] = enabled
         }
+    }
+    
+    // Weather location
+    val weatherLocation: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[WEATHER_LOCATION] ?: DEFAULT_WEATHER_LOCATION
+    }
+    
+    suspend fun setWeatherLocation(location: String) {
+        context.dataStore.edit { prefs ->
+            prefs[WEATHER_LOCATION] = location
+        }
+    }
+    
+    suspend fun getWeatherLocationSync(): String {
+        return context.dataStore.data.first()[WEATHER_LOCATION] ?: DEFAULT_WEATHER_LOCATION
     }
     
     suspend fun setWebhookUrl(url: String) {

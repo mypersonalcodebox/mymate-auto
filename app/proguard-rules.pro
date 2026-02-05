@@ -49,3 +49,18 @@
 
 # Keep Compose
 -keep class androidx.compose.** { *; }
+
+# Google Play Services Location
+-keep class com.google.android.gms.location.** { *; }
+-dontwarn com.google.android.gms.**
+
+# WorkManager
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.ListenableWorker
+-keepclassmembers class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
+# Kotlin metadata
+-keep class kotlin.Metadata { *; }
+-dontwarn kotlin.**

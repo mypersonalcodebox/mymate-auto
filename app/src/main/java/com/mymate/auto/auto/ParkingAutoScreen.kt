@@ -161,13 +161,23 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         statusMessage = null
         invalidate()
         
+        val cancellationToken = CancellationTokenSource()
         scope.launch {
             try {
-                val cancellationToken = CancellationTokenSource()
-                val locationTask = fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_HIGH_ACCURACY,
-                    cancellationToken.token
-                )
+                val locationTask = try {
+                    fusedLocationClient.getCurrentLocation(
+                        Priority.PRIORITY_HIGH_ACCURACY,
+                        cancellationToken.token
+                    )
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "Location permission revoked", e)
+                    withContext(Dispatchers.Main) {
+                        isSaving = false
+                        statusMessage = "❌ Locatie permissie ingetrokken"
+                        invalidate()
+                    }
+                    return@launch
+                }
                 
                 val location = Tasks.await(locationTask, 15, TimeUnit.SECONDS)
                 
@@ -228,12 +238,14 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                     statusMessage = "❌ Fout: ${e.localizedMessage}"
                     invalidate()
                 }
+            } finally {
+                cancellationToken.cancel()
             }
         }
     }
     
     private fun showParkingOptions(location: ParkingLocation) {
-        screenManager.push(ParkingDetailScreen(carContext, location, parkingDao, scope) {
+        screenManager.push(ParkingDetailScreen(carContext, location, parkingDao) {
             loadParkingLocations()
         })
     }
@@ -281,7 +293,6 @@ class ParkingDetailScreen(
     carContext: CarContext,
     private val location: ParkingLocation,
     private val parkingDao: com.mymate.auto.data.local.ParkingDao,
-    parentScope: CoroutineScope,
     private val onDeleted: () -> Unit
 ) : Screen(carContext) {
     

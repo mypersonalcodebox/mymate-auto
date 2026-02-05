@@ -23,7 +23,6 @@ class VoiceInputScreen(
     private val mainHandler = Handler(Looper.getMainLooper())
     
     private var inputText: String = ""
-    private var showConfirmation = false
     
     override fun onGetTemplate(): Template {
         // Use SearchTemplate for voice input - Android Auto handles the voice recognition

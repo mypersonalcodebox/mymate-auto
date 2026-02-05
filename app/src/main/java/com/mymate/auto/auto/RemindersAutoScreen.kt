@@ -161,7 +161,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                         .setTitle("$statusEmoji ${reminder.title.take(40)}")
                         .addText(timeText)
                         .setOnClickListener {
-                            screenManager.push(ReminderDetailScreen(carContext, reminder, reminderDao, scope) {
+                            screenManager.push(ReminderDetailScreen(carContext, reminder, reminderDao) {
                                 loadReminders()
                             })
                         }
@@ -270,7 +270,6 @@ class ReminderDetailScreen(
     carContext: CarContext,
     private val reminder: Reminder,
     private val reminderDao: com.mymate.auto.data.local.ReminderDao,
-    parentScope: CoroutineScope,
     private val onUpdated: () -> Unit
 ) : Screen(carContext) {
     
