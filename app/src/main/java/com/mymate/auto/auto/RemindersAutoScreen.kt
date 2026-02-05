@@ -13,6 +13,14 @@ import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * Android Auto Reminders Screen - Todo-list style
+ * 
+ * Features:
+ * - Quick-add buttons at top (5 min, 15 min, 1 hour, custom)
+ * - List of pending reminders (tap to mark complete/delete)
+ * - Toggle to show/hide completed reminders
+ */
 class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "RemindersAutoScreen"
@@ -73,52 +81,44 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
         
         val listBuilder = ItemList.Builder()
         
-        // Quick add options
+        // === QUICK ADD SECTION ===
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("⏱️ Over 5 minuten")
+                .setTitle("⏱️ 5 min")
+                .addText("Snel herinnering in 5 minuten")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_5min") { text ->
-                            addReminder(text, 5)
-                        }
-                    )
+                    navigateToVoiceInput(5, "Over 5 minuten")
                 }
                 .build()
         )
         
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("⏱️ Over 15 minuten")
+                .setTitle("⏱️ 15 min")
+                .addText("Snel herinnering in 15 minuten")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_15min") { text ->
-                            addReminder(text, 15)
-                        }
-                    )
+                    navigateToVoiceInput(15, "Over 15 minuten")
                 }
                 .build()
         )
         
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("⏱️ Over 1 uur")
+                .setTitle("⏱️ 1 uur")
+                .addText("Snel herinnering in 1 uur")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    screenManager.push(
-                        VoiceInputScreen(carContext, "reminder_1hr") { text ->
-                            addReminder(text, 60)
-                        }
-                    )
+                    navigateToVoiceInput(60, "Over 1 uur")
                 }
                 .build()
         )
         
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🎤 Aangepaste herinnering")
+                .setTitle("📝 Custom")
+                .addText("Aangepaste tijd instellen")
                 .setBrowsable(true)
                 .setOnClickListener {
                     screenManager.push(
@@ -130,10 +130,11 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Toggle completed
+        // === TOGGLE SECTION ===
         listBuilder.addItem(
             Row.Builder()
                 .setTitle(if (showCompleted) "👁️ Verberg voltooide" else "👁️ Toon voltooide")
+                .addText("─────────────────────")
                 .setOnClickListener {
                     showCompleted = !showCompleted
                     isLoading = true
@@ -143,37 +144,48 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // Show reminders
+        // === REMINDERS LIST ===
         if (reminders.isEmpty()) {
+            val emptyText = if (showCompleted) {
+                "Nog geen herinneringen aangemaakt"
+            } else {
+                "Geen openstaande herinneringen ✨"
+            }
             listBuilder.addItem(
                 Row.Builder()
-                    .setTitle("Geen herinneringen")
-                    .addText(if (showCompleted) "Je hebt nog geen herinneringen" else "Geen openstaande herinneringen")
+                    .setTitle("📭 Leeg")
+                    .addText(emptyText)
                     .build()
             )
         } else {
+            // Show up to 5 reminders (Android Auto limit)
             reminders.take(5).forEach { reminder ->
                 val statusEmoji = if (reminder.isCompleted) "✅" else "⏰"
                 val timeText = formatReminderTime(reminder.triggerTime)
+                val title = reminder.title.take(35)
                 
                 listBuilder.addItem(
                     Row.Builder()
-                        .setTitle("$statusEmoji ${reminder.title.take(40)}")
+                        .setTitle("$statusEmoji $title")
                         .addText(timeText)
+                        .setBrowsable(true)
                         .setOnClickListener {
-                            screenManager.push(ReminderDetailScreen(carContext, reminder, reminderDao) {
-                                loadReminders()
-                            })
+                            screenManager.push(
+                                ReminderDetailScreen(carContext, reminder, reminderDao) {
+                                    loadReminders()
+                                }
+                            )
                         }
                         .build()
                 )
             }
             
+            // Show overflow indicator
             if (reminders.size > 5) {
                 listBuilder.addItem(
                     Row.Builder()
-                        .setTitle("📋 ${reminders.size - 5} meer...")
-                        .addText("Bekijk in de phone app")
+                        .setTitle("📋 +${reminders.size - 5} meer")
+                        .addText("Bekijk alle in de telefoon app")
                         .build()
                 )
             }
@@ -186,7 +198,15 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
     
-    private fun addReminder(title: String, minutesFromNow: Int) {
+    private fun navigateToVoiceInput(minutes: Int, timeLabel: String) {
+        screenManager.push(
+            VoiceInputScreen(carContext, "reminder_quick") { text ->
+                addReminder(text, minutes, timeLabel)
+            }
+        )
+    }
+    
+    private fun addReminder(title: String, minutesFromNow: Int, timeLabel: String) {
         scope.launch {
             try {
                 val triggerTime = System.currentTimeMillis() + (minutesFromNow * 60 * 1000L)
@@ -203,16 +223,13 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 reminderDao.insertReminder(reminder)
                 loadReminders()
                 
-                val timeText = when (minutesFromNow) {
-                    5 -> "5 minuten"
-                    15 -> "15 minuten"
-                    60 -> "1 uur"
-                    else -> "$minutesFromNow minuten"
-                }
-                
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "✅ Herinnering ingesteld!", "Je wordt over $timeText herinnerd aan:\n\n\"$title\"") {
+                        MessageScreen(
+                            carContext,
+                            "✅ Herinnering toegevoegd",
+                            "$timeLabel:\n\n\"$title\""
+                        ) {
                             screenManager.popToRoot()
                             screenManager.push(RemindersAutoScreen(carContext))
                         }
@@ -222,7 +239,7 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 Log.e(TAG, "Error adding reminder", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet opslaan. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet opslaan") {
                             screenManager.pop()
                         }
                     )
@@ -232,30 +249,68 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     private fun addReminderWithParsing(text: String) {
-        // Try to parse time from message
         val lower = text.lowercase()
         
+        // Parse time from text
         val minutesFromNow = when {
             lower.contains("5 min") -> 5
             lower.contains("10 min") -> 10
             lower.contains("15 min") -> 15
             lower.contains("30 min") || lower.contains("half uur") -> 30
             lower.contains("1 uur") || lower.contains("een uur") -> 60
-            lower.contains("2 uur") -> 120
+            lower.contains("2 uur") || lower.contains("twee uur") -> 120
+            lower.contains("3 uur") || lower.contains("drie uur") -> 180
             lower.contains("morgen") -> 24 * 60
+            lower.contains("vanavond") -> calculateMinutesUntil(20, 0) // 8 PM
+            lower.contains("vanmiddag") -> calculateMinutesUntil(14, 0) // 2 PM
             else -> 30 // Default to 30 minutes
         }
         
-        // Remove time indicators from message
+        // Clean up title by removing time indicators
         val cleanTitle = text
             .replace(Regex("over \\d+ min(uten)?", RegexOption.IGNORE_CASE), "")
             .replace(Regex("over \\d+ uur", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("in \\d+ min(uten)?", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("in \\d+ uur", RegexOption.IGNORE_CASE), "")
             .replace("morgen", "", ignoreCase = true)
+            .replace("vanavond", "", ignoreCase = true)
+            .replace("vanmiddag", "", ignoreCase = true)
             .replace("herinner me aan", "", ignoreCase = true)
             .replace("herinner me", "", ignoreCase = true)
+            .replace("reminder", "", ignoreCase = true)
             .trim()
         
-        addReminder(cleanTitle.ifEmpty { text }, minutesFromNow)
+        val finalTitle = cleanTitle.ifEmpty { text }
+        
+        val timeLabel = when (minutesFromNow) {
+            5 -> "Over 5 minuten"
+            10 -> "Over 10 minuten"
+            15 -> "Over 15 minuten"
+            30 -> "Over 30 minuten"
+            60 -> "Over 1 uur"
+            120 -> "Over 2 uur"
+            180 -> "Over 3 uur"
+            else -> "Over $minutesFromNow minuten"
+        }
+        
+        addReminder(finalTitle, minutesFromNow, timeLabel)
+    }
+    
+    private fun calculateMinutesUntil(hour: Int, minute: Int): Int {
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+        }
+        
+        // If target time has passed, set for tomorrow
+        if (target.before(now)) {
+            target.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        
+        val diffMs = target.timeInMillis - now.timeInMillis
+        return (diffMs / (60 * 1000)).toInt()
     }
     
     private fun formatReminderTime(timestamp: Long): String {
@@ -263,16 +318,20 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
         val diff = timestamp - now
         
         return when {
-            diff < 0 -> "Verlopen: ${dateFormat.format(Date(timestamp))}"
-            diff < 60 * 1000 -> "Minder dan 1 minuut"
-            diff < 60 * 60 * 1000 -> "Over ${diff / (60 * 1000)} minuten"
-            diff < 24 * 60 * 60 * 1000 -> "Vandaag om ${timeFormat.format(Date(timestamp))}"
-            diff < 48 * 60 * 60 * 1000 -> "Morgen om ${timeFormat.format(Date(timestamp))}"
-            else -> dateFormat.format(Date(timestamp))
+            diff < 0 -> "⚠️ Verlopen: ${dateFormat.format(Date(timestamp))}"
+            diff < 60 * 1000 -> "🔔 < 1 minuut"
+            diff < 60 * 60 * 1000 -> "⏳ Over ${diff / (60 * 1000)} min"
+            diff < 24 * 60 * 60 * 1000 -> "📅 Vandaag ${timeFormat.format(Date(timestamp))}"
+            diff < 48 * 60 * 60 * 1000 -> "📅 Morgen ${timeFormat.format(Date(timestamp))}"
+            else -> "📆 ${dateFormat.format(Date(timestamp))}"
         }
     }
 }
 
+/**
+ * Detail screen for a single reminder
+ * Allows marking complete or deleting
+ */
 class ReminderDetailScreen(
     carContext: CarContext,
     private val reminder: Reminder,
@@ -280,6 +339,7 @@ class ReminderDetailScreen(
     private val onUpdated: () -> Unit
 ) : Screen(carContext) {
     
+    private val TAG = "ReminderDetailScreen"
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val dateFormat = SimpleDateFormat("EEEE d MMMM HH:mm", Locale("nl", "NL"))
@@ -294,63 +354,54 @@ class ReminderDetailScreen(
     
     override fun onGetTemplate(): Template {
         val triggerTime = dateFormat.format(Date(reminder.triggerTime))
-        val status = if (reminder.isCompleted) "Voltooid ✅" else "Actief ⏰"
+        val isPast = reminder.triggerTime < System.currentTimeMillis()
         
         val paneBuilder = Pane.Builder()
         
-        // Title
+        // Title row
         paneBuilder.addRow(
             Row.Builder()
-                .setTitle("📝 Herinnering")
-                .addText(reminder.title)
+                .setTitle("📝 ${reminder.title}")
                 .build()
         )
         
-        // Description if any
-        reminder.description?.let { desc ->
-            paneBuilder.addRow(
-                Row.Builder()
-                    .setTitle("📋 Details")
-                    .addText(desc)
-                    .build()
-            )
+        // Time row
+        val timeStatus = when {
+            reminder.isCompleted -> "✅ Voltooid"
+            isPast -> "⚠️ Verlopen"
+            else -> "⏰ Gepland"
         }
-        
-        // Time
         paneBuilder.addRow(
             Row.Builder()
-                .setTitle("⏰ Gepland")
+                .setTitle(timeStatus)
                 .addText(triggerTime)
                 .build()
         )
         
-        // Status
-        paneBuilder.addRow(
-            Row.Builder()
-                .setTitle("📊 Status")
-                .addText(status)
-                .build()
-        )
-        
-        // Toggle complete
-        if (!reminder.isCompleted) {
-            paneBuilder.addAction(
-                Action.Builder()
-                    .setTitle("✅ Markeer voltooid")
-                    .setOnClickListener {
-                        markCompleted()
-                    }
+        // Description if present
+        reminder.description?.let { desc ->
+            paneBuilder.addRow(
+                Row.Builder()
+                    .setTitle("📋 Details")
+                    .addText(desc.take(100))
                     .build()
             )
         }
         
-        // Delete button
+        // Action buttons
+        if (!reminder.isCompleted) {
+            paneBuilder.addAction(
+                Action.Builder()
+                    .setTitle("✅ Voltooid")
+                    .setOnClickListener { markCompleted() }
+                    .build()
+            )
+        }
+        
         paneBuilder.addAction(
             Action.Builder()
                 .setTitle("🗑️ Verwijder")
-                .setOnClickListener {
-                    deleteReminder()
-                }
+                .setOnClickListener { deleteReminder() }
                 .build()
         )
         
@@ -370,10 +421,10 @@ class ReminderDetailScreen(
                     screenManager.pop()
                 }
             } catch (e: Exception) {
-                Log.e("ReminderDetailScreen", "Error marking reminder complete", e)
+                Log.e(TAG, "Error marking reminder complete", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet bijwerken. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon niet bijwerken") {
                             screenManager.pop()
                         }
                     )
@@ -391,10 +442,10 @@ class ReminderDetailScreen(
                     screenManager.pop()
                 }
             } catch (e: Exception) {
-                Log.e("ReminderDetailScreen", "Error deleting reminder", e)
+                Log.e(TAG, "Error deleting reminder", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet verwijderen. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon niet verwijderen") {
                             screenManager.pop()
                         }
                     )

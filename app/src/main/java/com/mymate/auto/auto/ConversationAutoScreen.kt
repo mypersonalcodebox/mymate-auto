@@ -122,8 +122,14 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         if (messages.isEmpty()) {
             listBuilder.addItem(
                 Row.Builder()
-                    .setTitle("Begin een gesprek!")
-                    .addText("Tik op 'Nieuw bericht' om te starten")
+                    .setTitle("👋 Welkom!")
+                    .addText("Tik hierboven om een gesprek te starten")
+                    .build()
+            )
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("💡 Tip")
+                    .addText("Ik onthoud de context van ons gesprek")
                     .build()
             )
         } else {

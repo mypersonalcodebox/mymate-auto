@@ -62,7 +62,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading memories", e)
-                loadError = "Kon memories niet laden"
+                loadError = "Kon notities niet laden"
                 isLoading = false
                 withContext(Dispatchers.Main) {
                     invalidate()
@@ -73,8 +73,8 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     override fun onGetTemplate(): Template {
         if (isLoading) {
-            return MessageTemplate.Builder("Memories laden...")
-                .setTitle("📝 Memories")
+            return MessageTemplate.Builder("Notities laden...")
+                .setTitle("📝 Notities")
                 .setHeaderAction(Action.BACK)
                 .build()
         }
@@ -85,7 +85,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setHeaderAction(Action.BACK)
                 .addAction(
                     Action.Builder()
-                        .setTitle("🔄 Opnieuw proberen")
+                        .setTitle("🔄 Opnieuw")
                         .setOnClickListener {
                             isLoading = true
                             loadError = null
@@ -137,8 +137,8 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
         if (memories.isEmpty()) {
             listBuilder.addItem(
                 Row.Builder()
-                    .setTitle("Geen memories gevonden")
-                    .addText(if (selectedCategory != null) "Geen items in deze categorie" else "Voeg je eerste memory toe!")
+                    .setTitle("Geen notities")
+                    .addText(if (selectedCategory != null) "Geen items in deze categorie" else "Tik hierboven om te beginnen")
                     .build()
             )
         } else {
@@ -151,6 +151,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                     Row.Builder()
                         .setTitle("$emoji $preview")
                         .addText("$date • ${memory.category.name}")
+                        .setBrowsable(true)
                         .setOnClickListener {
                             screenManager.push(MemoryDetailAutoScreen(carContext, memory, memoryDao) {
                                 loadMemories()
@@ -163,15 +164,15 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
             if (memories.size > 6) {
                 listBuilder.addItem(
                     Row.Builder()
-                        .setTitle("📋 ${memories.size - 6} meer memories...")
-                        .addText("Bekijk in de phone app voor volledige lijst")
+                        .setTitle("📋 ${memories.size - 6} meer notities...")
+                        .addText("Bekijk in de app voor de volledige lijst")
                         .build()
                 )
             }
         }
         
         return ListTemplate.Builder()
-            .setTitle("📝 Memories" + (selectedCategory?.let { " - ${it.name}" } ?: ""))
+            .setTitle("📝 Notities" + (selectedCategory?.let { " - ${it.name}" } ?: ""))
             .setHeaderAction(Action.BACK)
             .setSingleList(listBuilder.build())
             .build()
@@ -195,7 +196,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "✅ Memory opgeslagen!", "Je memory is toegevoegd aan '${category.name}'") {
+                        MessageScreen(carContext, "✅ Opgeslagen!", "Notitie toegevoegd aan '${category.name}'") {
                             screenManager.popToRoot()
                             screenManager.push(MemoriesAutoScreen(carContext))
                         }
@@ -205,7 +206,7 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 Log.e(TAG, "Error adding memory", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon memory niet opslaan. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon notitie niet opslaan") {
                             screenManager.pop()
                         }
                     )
@@ -400,7 +401,7 @@ class MemoryDetailAutoScreen(
                 Log.e("MemoryDetailAutoScreen", "Error deleting memory", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon memory niet verwijderen. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon notitie niet verwijderen") {
                             screenManager.pop()
                         }
                     )
@@ -425,7 +426,7 @@ class MemoryDetailAutoScreen(
                 Log.e("MemoryDetailAutoScreen", "Error updating memory", e)
                 withContext(Dispatchers.Main) {
                     screenManager.push(
-                        MessageScreen(carContext, "❌ Fout", "Kon memory niet bijwerken. Probeer het opnieuw.") {
+                        MessageScreen(carContext, "❌ Fout", "Kon notitie niet bijwerken") {
                             screenManager.pop()
                         }
                     )

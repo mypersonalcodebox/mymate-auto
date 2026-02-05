@@ -24,6 +24,12 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
+/**
+ * Simple parking screen with 3 action buttons:
+ * 1. Save current location
+ * 2. Show last saved parking location
+ * 3. Navigate to car (walking)
+ */
 class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "ParkingAutoScreen"
@@ -32,22 +38,12 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     private val db = AppDatabase.getInstance(carContext)
     private val parkingDao = db.parkingDao()
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(carContext)
-    private val dateFormat = SimpleDateFormat("dd MMM HH:mm", Locale("nl", "NL"))
+    private val dateFormat = SimpleDateFormat("EEEE d MMM HH:mm", Locale("nl", "NL"))
     
-    @Volatile
-    private var parkingLocations: List<ParkingLocation> = emptyList()
-    
-    @Volatile
-    private var isLoading = true
-    
-    @Volatile
-    private var isSaving = false
-    
-    @Volatile
-    private var statusMessage: String? = null
-    
-    @Volatile
-    private var loadError: String? = null
+    @Volatile private var lastParking: ParkingLocation? = null
+    @Volatile private var isLoading = true
+    @Volatile private var isSaving = false
+    @Volatile private var statusMessage: String? = null
     
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -55,32 +51,40 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                 supervisorJob.cancel()
             }
         })
-        loadParkingLocations()
+        loadLastParking()
     }
     
-    private fun loadParkingLocations() {
+    private fun loadLastParking() {
         scope.launch {
             try {
-                parkingLocations = parkingDao.getAllParkingLocations()
-                loadError = null
+                lastParking = parkingDao.getAllParkingLocations().firstOrNull()
                 isLoading = false
-                withContext(Dispatchers.Main) {
-                    invalidate()
-                }
+                withContext(Dispatchers.Main) { invalidate() }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading parking locations", e)
-                loadError = "Kon locaties niet laden"
+                Log.e(TAG, "Error loading parking", e)
                 isLoading = false
-                withContext(Dispatchers.Main) {
-                    invalidate()
-                }
+                withContext(Dispatchers.Main) { invalidate() }
             }
         }
     }
     
     override fun onGetTemplate(): Template {
+        // Check location permission first
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
+            carContext, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        if (!hasLocationPermission) {
+            return MessageTemplate.Builder(
+                "Open de MyMate app op je telefoon en geef locatie permissie om deze functie te gebruiken."
+            )
+                .setTitle("📍 Locatie permissie nodig")
+                .setHeaderAction(Action.BACK)
+                .build()
+        }
+        
         if (isLoading) {
-            return MessageTemplate.Builder("Parkeerlocaties laden...")
+            return MessageTemplate.Builder("Even geduld...")
                 .setTitle("🅿️ Parking")
                 .setHeaderAction(Action.BACK)
                 .build()
@@ -88,74 +92,62 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         
         val listBuilder = ItemList.Builder()
         
-        // Walk to car button (only show if we have a saved location)
-        val latestParking = parkingLocations.firstOrNull()
-        if (latestParking != null) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("🚶 Loop naar m'n auto")
-                    .addText(latestParking.address?.take(35) ?: "Navigeer naar je auto")
-                    .setOnClickListener {
-                        navigateWalkingToLocation(latestParking)
-                    }
-                    .build()
-            )
-        }
-        
-        // Save current location button
+        // Button 1: Save current location
         listBuilder.addItem(
             Row.Builder()
                 .setTitle(if (isSaving) "⏳ Locatie opslaan..." else "📍 Huidige locatie opslaan")
+                .addText("Sla je huidige GPS locatie op")
                 .setOnClickListener {
-                    if (!isSaving) {
-                        saveCurrentLocation()
-                    }
+                    if (!isSaving) saveCurrentLocation()
                 }
                 .build()
         )
         
-        // Status message if any
+        // Button 2: Show last parking location
+        val parking = lastParking
+        if (parking != null) {
+            val address = parking.address ?: "Onbekend adres"
+            val timeAgo = getTimeAgo(parking.timestamp)
+            
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("🚗 Laatste parkeerplaats")
+                    .addText("$address • $timeAgo")
+                    .setOnClickListener {
+                        screenManager.push(ParkingDetailScreen(carContext, parking, parkingDao) {
+                            loadLastParking()
+                        })
+                    }
+                    .build()
+            )
+            
+            // Button 3: Navigate to car (walking)
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("🚶 Navigeer naar auto")
+                    .addText("Open Google Maps wandelroute")
+                    .setOnClickListener {
+                        navigateWalkingToLocation(parking)
+                    }
+                    .build()
+            )
+        } else {
+            // No saved locations
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("🚗 Nog geen locaties opgeslagen")
+                    .addText("Sla eerst je parkeerplaats op")
+                    .build()
+            )
+        }
+        
+        // Status message (inline)
         statusMessage?.let { msg ->
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle(msg)
                     .build()
             )
-        }
-        
-        // Show load error if any
-        loadError?.let { error ->
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("⚠️ $error")
-                    .addText("Probeer opnieuw te openen")
-                    .build()
-            )
-        }
-        
-        // List saved locations
-        if (parkingLocations.isEmpty() && loadError == null) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("Geen opgeslagen locaties")
-                    .addText("Sla je eerste parkeerlocatie op!")
-                    .build()
-            )
-        } else {
-            parkingLocations.take(6).forEach { location ->
-                val timeAgo = getTimeAgo(location.timestamp)
-                val address = location.address?.take(40) ?: "Onbekend adres"
-                
-                listBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("🚗 $address")
-                        .addText(timeAgo)
-                        .setOnClickListener {
-                            showParkingOptions(location)
-                        }
-                        .build()
-                )
-            }
         }
         
         return ListTemplate.Builder()
@@ -166,13 +158,6 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     private fun saveCurrentLocation() {
-        if (ContextCompat.checkSelfPermission(carContext, Manifest.permission.ACCESS_FINE_LOCATION) 
-            != PackageManager.PERMISSION_GRANTED) {
-            statusMessage = "❌ Geen locatie permissie"
-            invalidate()
-            return
-        }
-        
         isSaving = true
         statusMessage = null
         invalidate()
@@ -187,34 +172,14 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                     )
                 } catch (e: SecurityException) {
                     Log.e(TAG, "Location permission revoked", e)
-                    withContext(Dispatchers.Main) {
-                        isSaving = false
-                        statusMessage = "❌ Locatie permissie ingetrokken"
-                        invalidate()
-                    }
+                    showStatus("❌ Locatie permissie ingetrokken", isError = true)
                     return@launch
                 }
                 
                 val location = Tasks.await(locationTask, 15, TimeUnit.SECONDS)
                 
                 if (location != null) {
-                    // Get address
-                    val address = try {
-                        val geocoder = Geocoder(carContext, Locale("nl", "NL"))
-                        @Suppress("DEPRECATION")
-                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        addresses?.firstOrNull()?.let { addr ->
-                            buildString {
-                                addr.thoroughfare?.let { append(it) }
-                                addr.subThoroughfare?.let { append(" $it") }
-                                if (isNotEmpty()) append(", ")
-                                addr.locality?.let { append(it) }
-                            }.ifEmpty { null }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Geocoding failed", e)
-                        null
-                    }
+                    val address = getAddress(location.latitude, location.longitude)
                     
                     val parkingLocation = ParkingLocation(
                         latitude = location.latitude,
@@ -226,56 +191,60 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                     )
                     
                     parkingDao.insertParkingLocation(parkingLocation)
-                    parkingLocations = parkingDao.getAllParkingLocations()
+                    lastParking = parkingLocation
                     
-                    withContext(Dispatchers.Main) {
-                        isSaving = false
-                        statusMessage = "✅ Locatie opgeslagen!"
-                        invalidate()
-                    }
-                    
-                    // Clear status after 3 seconds
-                    delay(3000)
-                    withContext(Dispatchers.Main) {
-                        statusMessage = null
-                        invalidate()
-                    }
+                    showStatus("✅ Locatie opgeslagen!", isError = false)
                 } else {
-                    withContext(Dispatchers.Main) {
-                        isSaving = false
-                        statusMessage = "❌ Kon locatie niet bepalen"
-                        invalidate()
-                    }
+                    showStatus("❌ Kon locatie niet bepalen", isError = true)
                 }
             } catch (e: TimeoutException) {
                 Log.e(TAG, "Location timeout", e)
-                withContext(Dispatchers.Main) {
-                    isSaving = false
-                    statusMessage = "❌ Locatie timeout - probeer opnieuw"
-                    invalidate()
-                }
+                showStatus("❌ GPS timeout - probeer opnieuw", isError = true)
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving location", e)
-                withContext(Dispatchers.Main) {
-                    isSaving = false
-                    statusMessage = "❌ Opslaan mislukt - probeer opnieuw"
-                    invalidate()
-                }
+                showStatus("❌ Opslaan mislukt", isError = true)
             } finally {
                 cancellationToken.cancel()
             }
         }
     }
     
-    private fun showParkingOptions(location: ParkingLocation) {
-        screenManager.push(ParkingDetailScreen(carContext, location, parkingDao) {
-            loadParkingLocations()
-        })
+    private suspend fun showStatus(message: String, isError: Boolean) {
+        withContext(Dispatchers.Main) {
+            isSaving = false
+            statusMessage = message
+            invalidate()
+        }
+        
+        // Clear status after delay (longer for errors)
+        delay(if (isError) 4000L else 3000L)
+        withContext(Dispatchers.Main) {
+            statusMessage = null
+            invalidate()
+        }
+    }
+    
+    private fun getAddress(lat: Double, lon: Double): String? {
+        return try {
+            val geocoder = Geocoder(carContext, Locale("nl", "NL"))
+            @Suppress("DEPRECATION")
+            val addresses = geocoder.getFromLocation(lat, lon, 1)
+            addresses?.firstOrNull()?.let { addr ->
+                buildString {
+                    addr.thoroughfare?.let { append(it) }
+                    addr.subThoroughfare?.let { append(" $it") }
+                    if (isNotEmpty()) append(", ")
+                    addr.locality?.let { append(it) }
+                }.ifEmpty { null }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Geocoding failed", e)
+            null
+        }
     }
     
     private fun navigateWalkingToLocation(location: ParkingLocation) {
         try {
-            // Walking navigation to car location
             val uri = Uri.parse("google.navigation:q=${location.latitude},${location.longitude}&mode=w")
             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                 setPackage("com.google.android.apps.maps")
@@ -283,7 +252,6 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
             }
             carContext.startCarApp(intent)
         } catch (e: Exception) {
-            // Fallback to geo URI
             try {
                 val uri = Uri.parse("geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}(Mijn auto)")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
@@ -291,7 +259,7 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                 }
                 carContext.startCarApp(intent)
             } catch (e2: Exception) {
-                Log.e(TAG, "Walking navigation failed", e2)
+                Log.e(TAG, "Navigation failed", e2)
             }
         }
     }
@@ -303,15 +271,18 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         val days = hours / 24
         
         return when {
-            minutes < 1 -> "Zojuist"
-            minutes < 60 -> "$minutes min geleden"
-            hours < 24 -> "$hours uur geleden"
-            days < 7 -> "$days dagen geleden"
+            minutes < 1 -> "zojuist"
+            minutes < 60 -> "$minutes min"
+            hours < 24 -> "$hours uur"
+            days < 7 -> "$days dagen"
             else -> dateFormat.format(Date(timestamp))
         }
     }
 }
 
+/**
+ * Detail screen for a parking location with navigate and delete options.
+ */
 class ParkingDetailScreen(
     carContext: CarContext,
     private val location: ParkingLocation,
@@ -332,7 +303,7 @@ class ParkingDetailScreen(
     }
     
     override fun onGetTemplate(): Template {
-        val address = location.address ?: "Onbekende locatie"
+        val address = location.address ?: "Onbekend adres"
         val time = dateFormat.format(Date(location.timestamp))
         
         val paneBuilder = Pane.Builder()
@@ -353,13 +324,18 @@ class ParkingDetailScreen(
             )
         }
         
+        paneBuilder.addRow(
+            Row.Builder()
+                .setTitle("📐 Nauwkeurigheid")
+                .addText("${location.accuracy.toInt()} meter")
+                .build()
+        )
+        
         // Navigate button
         paneBuilder.addAction(
             Action.Builder()
-                .setTitle("🧭 Navigeer")
-                .setOnClickListener {
-                    navigateToLocation()
-                }
+                .setTitle("🚶 Navigeer")
+                .setOnClickListener { navigateToLocation() }
                 .build()
         )
         
@@ -367,14 +343,12 @@ class ParkingDetailScreen(
         paneBuilder.addAction(
             Action.Builder()
                 .setTitle("🗑️ Verwijder")
-                .setOnClickListener {
-                    deleteLocation()
-                }
+                .setOnClickListener { deleteLocation() }
                 .build()
         )
         
         return PaneTemplate.Builder(paneBuilder.build())
-            .setTitle("🚗 Auto Locatie")
+            .setTitle("🚗 Parkeerlocatie")
             .setHeaderAction(Action.BACK)
             .build()
     }
@@ -388,7 +362,6 @@ class ParkingDetailScreen(
             }
             carContext.startCarApp(intent)
         } catch (e: Exception) {
-            // Fallback to geo URI
             try {
                 val uri = Uri.parse("geo:${location.latitude},${location.longitude}?q=${location.latitude},${location.longitude}")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
@@ -411,7 +384,6 @@ class ParkingDetailScreen(
                 }
             } catch (e: Exception) {
                 Log.e("ParkingDetailScreen", "Delete failed", e)
-                // Still pop - the data might be corrupted, let user refresh the list
                 withContext(Dispatchers.Main) {
                     screenManager.pop()
                 }
