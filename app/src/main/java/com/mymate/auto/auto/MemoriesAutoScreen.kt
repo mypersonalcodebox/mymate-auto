@@ -435,26 +435,3 @@ class MemoryDetailAutoScreen(
         }
     }
 }
-
-class MessageScreen(
-    carContext: CarContext,
-    private val title: String,
-    private val message: String,
-    private val onDismiss: () -> Unit
-) : Screen(carContext) {
-    
-    override fun onGetTemplate(): Template {
-        return MessageTemplate.Builder(message)
-            .setTitle(title)
-            .setHeaderAction(Action.BACK)
-            .addAction(
-                Action.Builder()
-                    .setTitle("OK")
-                    .setOnClickListener {
-                        onDismiss()
-                    }
-                    .build()
-            )
-            .build()
-    }
-}
