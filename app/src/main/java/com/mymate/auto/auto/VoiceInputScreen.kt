@@ -48,7 +48,71 @@ class VoiceInputScreen(
             .setShowKeyboardByDefault(false) // Let voice be primary
             .setInitialSearchText(inputText)
             .setSearchHint(getSearchHint())
+            .setItemList(buildHintList())
             .build()
+    }
+    
+    private fun buildHintList(): ItemList {
+        val builder = ItemList.Builder()
+        
+        // Add contextual suggestions based on actionContext
+        val suggestions = getContextualSuggestions()
+        suggestions.forEach { (title, subtitle) ->
+            builder.addItem(
+                Row.Builder()
+                    .setTitle(title)
+                    .addText(subtitle)
+                    .build()
+            )
+        }
+        
+        return builder.build()
+    }
+    
+    private fun getContextualSuggestions(): List<Pair<String, String>> {
+        return when (actionContext) {
+            "start_task" -> listOf(
+                "💡 Tip: Beschrijf je taak" to "Bijv. 'Fix de login bug in de app'",
+                "⏱️ Tijdsinschatting" to "Voeg optioneel een deadline toe"
+            )
+            "github_issue" -> listOf(
+                "🐛 Bug melden" to "Beschrijf wat er mis gaat",
+                "✨ Feature request" to "Beschrijf de gewenste functionaliteit"
+            )
+            "build_feature" -> listOf(
+                "🏗️ Nieuwe feature" to "Beschrijf wat je wilt bouwen",
+                "📋 Specificaties" to "Wees zo specifiek mogelijk"
+            )
+            "project_update" -> listOf(
+                "📊 Voortgang delen" to "Wat heb je bereikt?",
+                "🚧 Blokkades" to "Waar loop je tegenaan?"
+            )
+            "dev_idea" -> listOf(
+                "💭 Idee pitchen" to "Beschrijf je concept",
+                "🎯 Doel" to "Wat wil je ermee bereiken?"
+            )
+            "quick_note" -> listOf(
+                "📝 Snelle notitie" to "Spreek je gedachte in",
+                "🏷️ Tags" to "Voeg keywords toe voor later"
+            )
+            "remind_me" -> listOf(
+                "⏰ Herinnering instellen" to "Bijv. 'Over 2 uur bellen met Jan'",
+                "📅 Met datum" to "Bijv. 'Morgen om 9 uur meeting'"
+            )
+            "search_info" -> listOf(
+                "🔍 Zoeken" to "Stel je vraag",
+                "📚 Documentatie" to "Zoek in je projecten"
+            )
+            "send_update" -> listOf(
+                "💬 Bericht sturen" to "Typ of spreek je update",
+                "📨 Naar wie?" to "Specificeer de ontvanger"
+            )
+            else -> listOf(
+                "💡 Tip: Spreek of typ je bericht" to "Druk op de microfoon om te beginnen",
+                "🎤 Spraakinvoer" to "Houd de microfoon knop ingedrukt",
+                "⌨️ Typen" to "Of gebruik het toetsenbord"
+            )
+        }
     }
     
     private fun getSearchHint(): String {

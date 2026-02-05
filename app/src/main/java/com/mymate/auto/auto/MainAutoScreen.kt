@@ -467,10 +467,23 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
                 val responseText = try {
                     response.body?.use { body ->
                         val responseBody = body.string()
-                        val result = gson.fromJson(responseBody, Map::class.java)
-                        result["reply"]?.toString() 
-                            ?: result["message"]?.toString() 
-                            ?: "Geen antwoord"
+                        
+                        // Check HTTP status before parsing
+                        if (!response.isSuccessful) {
+                            Log.e(TAG, "HTTP error ${response.code}: $responseBody")
+                            when (response.code) {
+                                401 -> "❌ Token onjuist"
+                                403 -> "❌ Geen toegang"
+                                404 -> "❌ Webhook niet gevonden"
+                                500, 502, 503, 504 -> "❌ Server fout (${response.code})"
+                                else -> "❌ Fout: HTTP ${response.code}"
+                            }
+                        } else {
+                            val result = gson.fromJson(responseBody, Map::class.java)
+                            result["reply"]?.toString() 
+                                ?: result["message"]?.toString() 
+                                ?: "Geen antwoord"
+                        }
                     } ?: "Leeg antwoord"
                 } catch (e: Exception) {
                     Log.e(TAG, "Parse error", e)
