@@ -38,11 +38,22 @@ class ParkingLocationService : Service() {
         private const val MIN_ACCURACY_METERS = 50f // Only save if accuracy is good
         
         fun start(context: Context) {
+            // Check location permission before starting (required for Android 14+)
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) 
+                != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "Cannot start ParkingLocationService - no location permission")
+                return
+            }
+            
             val intent = Intent(context, ParkingLocationService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start ParkingLocationService: ${e.message}", e)
             }
         }
     }
@@ -68,15 +79,30 @@ class ParkingLocationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "ParkingLocationService started - saving parking location")
         
-        // Start as foreground service
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("📍 Parkeerlocatie opslaan...")
-            .setContentText("Even geduld")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        // Check permissions FIRST before starting foreground service (Android 14+ requirement)
+        if (!hasLocationPermission()) {
+            Log.e(TAG, "No location permission - cannot start foreground service with location type")
+            showNotification("Geen locatie permissie", "Geef locatie toegang in instellingen")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            // Start as foreground service
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("📍 Parkeerlocatie opslaan...")
+                .setContentText("Even geduld")
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+            
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException starting foreground: ${e.message}", e)
+            showNotification("Locatie service fout", "Herstart de app en geef permissies")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         
         // Get location and save
         saveCurrentLocation()
