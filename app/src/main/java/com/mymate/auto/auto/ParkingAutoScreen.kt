@@ -62,12 +62,14 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
         scope.launch {
             try {
                 parkingLocations = parkingDao.getAllParkingLocations()
+                loadError = null
                 isLoading = false
                 withContext(Dispatchers.Main) {
                     invalidate()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading parking locations", e)
+                loadError = "Kon locaties niet laden"
                 isLoading = false
                 withContext(Dispatchers.Main) {
                     invalidate()
@@ -121,8 +123,18 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         
+        // Show load error if any
+        loadError?.let { error ->
+            listBuilder.addItem(
+                Row.Builder()
+                    .setTitle("⚠️ $error")
+                    .addText("Probeer opnieuw te openen")
+                    .build()
+            )
+        }
+        
         // List saved locations
-        if (parkingLocations.isEmpty()) {
+        if (parkingLocations.isEmpty() && loadError == null) {
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle("Geen opgeslagen locaties")
@@ -235,11 +247,18 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
                         invalidate()
                     }
                 }
+            } catch (e: TimeoutException) {
+                Log.e(TAG, "Location timeout", e)
+                withContext(Dispatchers.Main) {
+                    isSaving = false
+                    statusMessage = "❌ Locatie timeout - probeer opnieuw"
+                    invalidate()
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving location", e)
                 withContext(Dispatchers.Main) {
                     isSaving = false
-                    statusMessage = "❌ Fout: ${e.localizedMessage}"
+                    statusMessage = "❌ Opslaan mislukt - probeer opnieuw"
                     invalidate()
                 }
             } finally {
@@ -384,10 +403,18 @@ class ParkingDetailScreen(
     
     private fun deleteLocation() {
         scope.launch {
-            parkingDao.deleteParkingLocation(location)
-            withContext(Dispatchers.Main) {
-                onDeleted()
-                screenManager.pop()
+            try {
+                parkingDao.deleteParkingLocation(location)
+                withContext(Dispatchers.Main) {
+                    onDeleted()
+                    screenManager.pop()
+                }
+            } catch (e: Exception) {
+                Log.e("ParkingDetailScreen", "Delete failed", e)
+                // Still pop - the data might be corrupted, let user refresh the list
+                withContext(Dispatchers.Main) {
+                    screenManager.pop()
+                }
             }
         }
     }

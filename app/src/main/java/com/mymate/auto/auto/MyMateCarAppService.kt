@@ -149,8 +149,16 @@ class MyMateSession : Session() {
     
     private fun sendParkingNotification(location: Location?) {
         val preferencesManager = PreferencesManager(carContext)
-        val webhookUrl = runBlocking { preferencesManager.getWebhookUrlSync() }
-        if (webhookUrl.isEmpty()) return
+        val webhookUrl = try {
+            runBlocking { preferencesManager.getWebhookUrlSync() }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get webhook URL", e)
+            return
+        }
+        if (webhookUrl.isEmpty()) {
+            Log.d(TAG, "No webhook URL configured, skipping parking notification")
+            return
+        }
         
         val client = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -178,8 +186,33 @@ class MyMateSession : Session() {
         
         try {
             client.newCall(request).execute().use { response ->
-                Log.d(TAG, "Parking notification sent: ${response.code}")
+                when {
+                    response.isSuccessful -> {
+                        Log.d(TAG, "Parking notification sent successfully: ${response.code}")
+                    }
+                    response.code == 401 || response.code == 403 -> {
+                        // Auth errors - log but don't crash, webhook may need reconfiguration
+                        Log.w(TAG, "Parking notification auth failed (${response.code}): webhook may need reconfiguration")
+                    }
+                    response.code in 400..499 -> {
+                        // Client errors - log the issue
+                        Log.w(TAG, "Parking notification client error: ${response.code} ${response.message}")
+                    }
+                    response.code in 500..599 -> {
+                        // Server errors - transient, just log
+                        Log.w(TAG, "Parking notification server error: ${response.code} ${response.message}")
+                    }
+                    else -> {
+                        Log.w(TAG, "Parking notification unexpected response: ${response.code}")
+                    }
+                }
             }
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.w(TAG, "Parking notification timed out")
+        } catch (e: java.net.UnknownHostException) {
+            Log.w(TAG, "Parking notification failed: no network or unknown host")
+        } catch (e: java.io.IOException) {
+            Log.w(TAG, "Parking notification IO error: ${e.message}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send parking notification", e)
         }

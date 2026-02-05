@@ -79,6 +79,24 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         }
         
+        if (loadError != null) {
+            return MessageTemplate.Builder(loadError!!)
+                .setTitle("❌ Fout")
+                .setHeaderAction(Action.BACK)
+                .addAction(
+                    Action.Builder()
+                        .setTitle("🔄 Opnieuw proberen")
+                        .setOnClickListener {
+                            isLoading = true
+                            loadError = null
+                            invalidate()
+                            loadMemories()
+                        }
+                        .build()
+                )
+                .build()
+        }
+        
         val listBuilder = ItemList.Builder()
         
         // Add new memory via voice

@@ -37,11 +37,10 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🧪 Test verbinding")
-                .addText("Controleer gateway")
+                .addText("TCP + WebSocket auth test")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    val gatewayUrl = runBlocking { preferencesManager.getGatewayUrlSync() }
-                    screenManager.push(ConnectionTestScreen(carContext, gatewayUrl))
+                    screenManager.push(ConnectionTestAutoScreen(carContext))
                 }
                 .build()
         )
@@ -196,78 +195,4 @@ class AppInfoScreen(carContext: CarContext) : Screen(carContext) {
     }
 }
 
-/**
- * Connection test screen
- */
-class ConnectionTestScreen(
-    carContext: CarContext,
-    private val gatewayUrl: String
-) : Screen(carContext) {
-    
-    private val TAG = "ConnectionTestScreen"
-    
-    @Volatile
-    private var testStatus = "Testen..."
-    
-    @Volatile
-    private var testComplete = false
-    
-    init {
-        testConnection()
-    }
-    
-    private fun testConnection() {
-        Thread {
-            try {
-                val url = java.net.URI(gatewayUrl)
-                val host = url.host ?: throw IllegalArgumentException("Geen host in URL")
-                val port = if (url.port > 0) url.port else 18789
-                
-                val socket = java.net.Socket()
-                socket.connect(java.net.InetSocketAddress(host, port), 5000)
-                socket.close()
-                testStatus = "✅ Verbinding OK!\n\n$host:$port bereikbaar"
-                testComplete = true
-            } catch (e: Exception) {
-                Log.e(TAG, "Connection test failed", e)
-                testStatus = "❌ Mislukt\n\n${e.localizedMessage}"
-                testComplete = true
-            }
-            
-            try {
-                invalidate()
-            } catch (e: Exception) {
-                Log.e(TAG, "Invalidate failed", e)
-            }
-        }.start()
-    }
-    
-    override fun onGetTemplate(): Template {
-        val builder = MessageTemplate.Builder(testStatus)
-            .setTitle("🧪 Verbindingstest")
-            .setHeaderAction(Action.BACK)
-        
-        if (testComplete) {
-            builder.addAction(
-                Action.Builder()
-                    .setTitle("OK")
-                    .setOnClickListener { screenManager.pop() }
-                    .build()
-            )
-            
-            builder.addAction(
-                Action.Builder()
-                    .setTitle("🔄 Opnieuw")
-                    .setOnClickListener {
-                        testStatus = "Testen..."
-                        testComplete = false
-                        invalidate()
-                        testConnection()
-                    }
-                    .build()
-            )
-        }
-        
-        return builder.build()
-    }
-}
+// ConnectionTestScreen moved to ConnectionTestAutoScreen.kt with full TCP + WebSocket auth testing

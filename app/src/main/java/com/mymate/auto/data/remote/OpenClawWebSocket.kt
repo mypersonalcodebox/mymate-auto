@@ -314,15 +314,38 @@ class OpenClawWebSocket(
                 val payload = json.getAsJsonObject("payload")
                 val payloadType = payload?.get("type")?.asString
                 if (payloadType == "hello-ok") {
-                    Log.d(TAG, "Connected successfully to OpenClaw Gateway")
+                    Log.i(TAG, "✓ Connected successfully to OpenClaw Gateway")
                     isConnected.set(true)
                     reconnectAttempt.set(0)
                     _connectionState.value = ConnectionState.CONNECTED
                 }
             } else {
-                val error = json.getAsJsonObject("error")?.get("message")?.asString ?: "Connection failed"
-                Log.e(TAG, "Connect failed: $error")
+                val errorObj = json.getAsJsonObject("error")
+                val errorCode = errorObj?.get("code")?.asString ?: "UNKNOWN"
+                val errorMessage = errorObj?.get("message")?.asString ?: "Connection failed"
+                Log.e(TAG, "✗ Connect failed: [$errorCode] $errorMessage")
                 _connectionState.value = ConnectionState.ERROR
+                
+                // Check if it's an auth error
+                val isAuthError = errorCode in listOf("AUTH_FAILED", "INVALID_TOKEN", "UNAUTHORIZED", "FORBIDDEN") ||
+                                  errorMessage.lowercase().contains("token") ||
+                                  errorMessage.lowercase().contains("auth")
+                
+                val userMessage = if (isAuthError) {
+                    "Token onjuist of geen toegang"
+                } else {
+                    errorMessage
+                }
+                
+                scope.launch {
+                    _connectionErrors.emit(ConnectionError(
+                        code = null,
+                        reason = errorMessage,
+                        userMessage = userMessage,
+                        isAuthError = isAuthError,
+                        isRecoverable = !isAuthError
+                    ))
+                }
             }
             return
         }
