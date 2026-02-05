@@ -157,33 +157,81 @@ class OpenClawWebSocket(
             }
             
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closing: $code $reason")
+                Log.d(TAG, "WebSocket closing: code=$code, reason='$reason'")
                 webSocket.close(1000, null)
             }
             
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closed: $code $reason")
+                Log.i(TAG, "WebSocket closed: code=$code, reason='$reason'")
                 isConnected.set(false)
-                _connectionState.value = ConnectionState.DISCONNECTED
                 
-                // Only reconnect for normal/going-away close codes, not policy violations
-                if (autoReconnect && code in listOf(1000, 1001, 1006)) {
+                // Parse close code and determine error type
+                val (userMessage, isAuthError, isRecoverable) = parseCloseCode(code, reason)
+                
+                if (code != 1000) { // 1000 = normal closure
+                    Log.w(TAG, "WebSocket closed abnormally: $userMessage (code=$code)")
+                    _connectionState.value = ConnectionState.ERROR
+                    
+                    scope.launch {
+                        _connectionErrors.emit(ConnectionError(
+                            code = code,
+                            reason = reason,
+                            userMessage = userMessage,
+                            isAuthError = isAuthError,
+                            isRecoverable = isRecoverable
+                        ))
+                    }
+                } else {
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
+                
+                // Only reconnect for recoverable errors, NOT auth failures
+                if (autoReconnect && isRecoverable && !isAuthError) {
                     scheduleReconnect()
+                } else if (isAuthError) {
+                    Log.w(TAG, "Authentication error - not reconnecting. Check your token.")
                 }
             }
             
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket error: ${t.message}", t)
+                val responseCode = response?.code
+                val responseMessage = response?.message ?: t.message ?: "Unknown error"
+                
+                Log.e(TAG, "WebSocket failure: ${t.message} (HTTP $responseCode: $responseMessage)", t)
                 isConnected.set(false)
                 _connectionState.value = ConnectionState.ERROR
+                
+                // Check if this is an auth error from HTTP response
+                val isAuthError = responseCode in listOf(401, 403)
+                val userMessage = when {
+                    isAuthError -> "Token onjuist of verlopen"
+                    responseCode == 404 -> "Gateway niet gevonden"
+                    t is java.net.UnknownHostException -> "Server niet bereikbaar - controleer adres"
+                    t is java.net.ConnectException -> "Kan niet verbinden met server"
+                    t is java.net.SocketTimeoutException -> "Verbinding timeout"
+                    else -> "Verbindingsfout: ${t.message}"
+                }
+                
+                scope.launch {
+                    _connectionErrors.emit(ConnectionError(
+                        code = responseCode,
+                        reason = responseMessage,
+                        userMessage = userMessage,
+                        isAuthError = isAuthError,
+                        isRecoverable = !isAuthError
+                    ))
+                }
                 
                 // Reject pending requests
                 val pending = pendingRequests.values.toList()
                 pendingRequests.clear()
                 pending.forEach { it.completeExceptionally(t) }
                 
-                if (autoReconnect) {
+                // Don't reconnect on auth errors
+                if (autoReconnect && !isAuthError) {
                     scheduleReconnect()
+                } else if (isAuthError) {
+                    Log.w(TAG, "Authentication error - not reconnecting. Check your token.")
                 }
             }
         })

@@ -220,6 +220,13 @@ class RemindersAutoScreen(carContext: CarContext) : Screen(carContext) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error adding reminder", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet opslaan. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }
@@ -355,21 +362,43 @@ class ReminderDetailScreen(
     
     private fun markCompleted() {
         scope.launch {
-            val updated = reminder.copy(isCompleted = true)
-            reminderDao.updateReminder(updated)
-            withContext(Dispatchers.Main) {
-                onUpdated()
-                screenManager.pop()
+            try {
+                val updated = reminder.copy(isCompleted = true)
+                reminderDao.updateReminder(updated)
+                withContext(Dispatchers.Main) {
+                    onUpdated()
+                    screenManager.pop()
+                }
+            } catch (e: Exception) {
+                Log.e("ReminderDetailScreen", "Error marking reminder complete", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet bijwerken. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }
     
     private fun deleteReminder() {
         scope.launch {
-            reminderDao.deleteReminder(reminder)
-            withContext(Dispatchers.Main) {
-                onUpdated()
-                screenManager.pop()
+            try {
+                reminderDao.deleteReminder(reminder)
+                withContext(Dispatchers.Main) {
+                    onUpdated()
+                    screenManager.pop()
+                }
+            } catch (e: Exception) {
+                Log.e("ReminderDetailScreen", "Error deleting reminder", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon herinnering niet verwijderen. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }

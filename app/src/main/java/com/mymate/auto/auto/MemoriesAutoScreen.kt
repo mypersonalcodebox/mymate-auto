@@ -29,6 +29,9 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
     private var isLoading = true
     
     @Volatile
+    private var loadError: String? = null
+    
+    @Volatile
     private var selectedCategory: MemoryCategory? = null
     
     @Volatile
@@ -179,6 +182,13 @@ class MemoriesAutoScreen(carContext: CarContext) : Screen(carContext) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error adding memory", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon memory niet opslaan. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }
@@ -359,24 +369,46 @@ class MemoryDetailAutoScreen(
     
     private fun deleteMemory() {
         scope.launch {
-            memoryDao.deleteMemory(memory)
-            withContext(Dispatchers.Main) {
-                onDeleted()
-                screenManager.pop()
+            try {
+                memoryDao.deleteMemory(memory)
+                withContext(Dispatchers.Main) {
+                    onDeleted()
+                    screenManager.pop()
+                }
+            } catch (e: Exception) {
+                Log.e("MemoryDetailAutoScreen", "Error deleting memory", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon memory niet verwijderen. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }
     
     private fun updateMemory(newContent: String) {
         scope.launch {
-            val updatedMemory = memory.copy(
-                content = newContent,
-                updatedAt = System.currentTimeMillis()
-            )
-            memoryDao.update(updatedMemory)
-            withContext(Dispatchers.Main) {
-                onDeleted() // Refresh the list
-                screenManager.pop()
+            try {
+                val updatedMemory = memory.copy(
+                    content = newContent,
+                    updatedAt = System.currentTimeMillis()
+                )
+                memoryDao.update(updatedMemory)
+                withContext(Dispatchers.Main) {
+                    onDeleted() // Refresh the list
+                    screenManager.pop()
+                }
+            } catch (e: Exception) {
+                Log.e("MemoryDetailAutoScreen", "Error updating memory", e)
+                withContext(Dispatchers.Main) {
+                    screenManager.push(
+                        MessageScreen(carContext, "❌ Fout", "Kon memory niet bijwerken. Probeer het opnieuw.") {
+                            screenManager.pop()
+                        }
+                    )
+                }
             }
         }
     }

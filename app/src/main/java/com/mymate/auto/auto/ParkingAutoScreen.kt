@@ -22,6 +22,7 @@ import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     
