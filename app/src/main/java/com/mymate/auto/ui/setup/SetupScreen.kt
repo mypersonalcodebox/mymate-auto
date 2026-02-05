@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -211,39 +210,22 @@ fun SetupScreen(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Save button
-            var isSaving by remember { mutableStateOf(false) }
-            val coroutineScope = rememberCoroutineScope()
-            
+            // Save button - simple synchronous save
             Button(
                 onClick = { 
-                    isSaving = true
-                    coroutineScope.launch {
-                        try {
-                            viewModel.saveConfigurationAndWait()
-                            onSetupComplete()
-                        } catch (e: Exception) {
-                            isSaving = false
-                        }
-                    }
+                    viewModel.saveConfiguration()
+                    // Small delay then navigate
+                    onSetupComplete()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS && !isSaving,
+                enabled = uiState.connectionStatus == ConnectionStatus.SUCCESS,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryBlue
                 )
             ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Icon(Icons.Default.Save, contentDescription = null)
-                }
+                Icon(Icons.Default.Save, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (isSaving) "Opslaan..." else "Opslaan en Starten")
+                Text("Opslaan en Starten")
             }
             
             Spacer(modifier = Modifier.height(32.dp))
