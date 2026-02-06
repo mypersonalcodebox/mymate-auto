@@ -163,6 +163,12 @@ class VoiceInputScreen(
     private fun getSearchHint(): String {
         return when (actionContext) {
             "conversation" -> "Spreek nu..."
+            // Template prompts - user completes the sentence
+            "discussion" -> "...discussiëren over?"
+            "brainstorm" -> "...brainstormen over?"
+            "research" -> "...informatie over?"
+            "code" -> "...code voor?"
+            // Other contexts
             "start_task" -> "Beschrijf de taak..."
             "github_issue" -> "Beschrijf de issue..."
             "build_feature" -> "Welke feature wil je bouwen?"

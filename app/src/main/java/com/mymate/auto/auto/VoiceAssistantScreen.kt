@@ -97,7 +97,34 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
         }
         
         // Quick action buttons in overflow menu (⋮)
+        // Some are direct questions, others open voice input with a template
         val actionStrip = ActionStrip.Builder()
+            // Templates - open voice input to complete
+            .addAction(
+                Action.Builder()
+                    .setTitle("📝 Discussie...")
+                    .setOnClickListener { startTemplatedVoice("Laten we discussiëren over", "discussion") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("💡 Brainstorm...")
+                    .setOnClickListener { startTemplatedVoice("Help me brainstormen over", "brainstorm") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("🔍 Research...")
+                    .setOnClickListener { startTemplatedVoice("Zoek informatie over", "research") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("💻 Code...")
+                    .setOnClickListener { startTemplatedVoice("Help me met code voor", "code") }
+                    .build()
+            )
+            // Direct questions - no voice input needed
             .addAction(
                 Action.Builder()
                     .setTitle("📅 Agenda")
@@ -108,18 +135,6 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                 Action.Builder()
                     .setTitle("🌤️ Weer")
                     .setOnClickListener { sendQuickMessage("Hoe is het weer vandaag?") }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("📍 Parking")
-                    .setOnClickListener { sendQuickMessage("Waar heb ik mijn auto geparkeerd?") }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("⏰ Tijd")
-                    .setOnClickListener { sendQuickMessage("Hoe laat is het nu?") }
                     .build()
             )
             .build()
@@ -134,6 +149,20 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     private fun sendQuickMessage(message: String) {
         if (isProcessing) return
         handleUserMessage(message)
+    }
+    
+    /**
+     * Open voice input with a prompt template
+     * User speaks to complete the template
+     */
+    private fun startTemplatedVoice(promptPrefix: String, context: String) {
+        screenManager.push(
+            VoiceInputScreen(carContext, context) { userInput ->
+                // Combine template + user input
+                val fullMessage = "$promptPrefix $userInput"
+                handleUserMessage(fullMessage)
+            }
+        )
     }
     
     private fun startVoiceInput() {
