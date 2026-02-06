@@ -93,10 +93,7 @@ class VoiceInputScreen(
     
     private fun getContextualSuggestions(): List<Pair<String, String>> {
         return when (actionContext) {
-            "conversation" -> listOf(
-                "💬 Chat met MyMate" to "Stel een vraag of deel iets",
-                "🔄 Blijf in gesprek" to "Ik onthoud de context"
-            )
+            "conversation" -> emptyList() // No suggestions - voice first!
             "start_task" -> listOf(
                 "💡 Tip: Beschrijf je taak" to "Bijv. 'Fix de login bug in de app'",
                 "⏱️ Tijdsinschatting" to "Voeg optioneel een deadline toe"
@@ -165,7 +162,7 @@ class VoiceInputScreen(
     
     private fun getSearchHint(): String {
         return when (actionContext) {
-            "conversation" -> "Wat wil je zeggen?"
+            "conversation" -> "Spreek nu..."
             "start_task" -> "Beschrijf de taak..."
             "github_issue" -> "Beschrijf de issue..."
             "build_feature" -> "Welke feature wil je bouwen?"
