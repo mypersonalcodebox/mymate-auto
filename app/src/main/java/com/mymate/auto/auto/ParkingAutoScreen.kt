@@ -69,9 +69,12 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     override fun onGetTemplate(): Template {
-        // Check location permission first
+        // Check location permission using applicationContext (more reliable than carContext)
+        // Accept either FINE or COARSE location - both work for parking feature
         val hasLocationPermission = ContextCompat.checkSelfPermission(
-            carContext, Manifest.permission.ACCESS_FINE_LOCATION
+            carContext.applicationContext, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            carContext.applicationContext, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         
         if (!hasLocationPermission) {
