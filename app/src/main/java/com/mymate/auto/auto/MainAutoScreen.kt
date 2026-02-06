@@ -15,10 +15,10 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // 1. 🎤 PRAAT MET MYMATE - Voice Assistant (primary feature)
+        // 1. 🎤 Chat with My Mate - Voice Assistant (primary feature)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🎤 PRAAT MET MYMATE")
+                .setTitle("🎤 Chat with My Mate")
                 .addText("Start een gesprek met je AI-assistent")
                 .setBrowsable(true)
                 .setOnClickListener {
