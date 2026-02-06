@@ -139,6 +139,7 @@ class MorningBriefingScreen(carContext: CarContext) : Screen(carContext) {
                 }
             }
         }
+        Log.d(TAG, "Speaking briefing: ${speech.take(80)}...")
         tts.speak(speech, stripMarkdown = false)
     }
     
