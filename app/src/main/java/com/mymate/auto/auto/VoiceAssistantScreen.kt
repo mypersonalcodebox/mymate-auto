@@ -96,35 +96,8 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         
-        // Quick action buttons in overflow menu (⋮)
-        // Some are direct questions, others open voice input with a template
+        // Quick action buttons - PaneTemplate allows max 2 actions!
         val actionStrip = ActionStrip.Builder()
-            // Templates - open voice input to complete
-            .addAction(
-                Action.Builder()
-                    .setTitle("📝 Discussie...")
-                    .setOnClickListener { startTemplatedVoice("Laten we discussiëren over", "discussion") }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("💡 Brainstorm...")
-                    .setOnClickListener { startTemplatedVoice("Help me brainstormen over", "brainstorm") }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("🔍 Research...")
-                    .setOnClickListener { startTemplatedVoice("Zoek informatie over", "research") }
-                    .build()
-            )
-            .addAction(
-                Action.Builder()
-                    .setTitle("💻 Code...")
-                    .setOnClickListener { startTemplatedVoice("Help me met code voor", "code") }
-                    .build()
-            )
-            // Direct questions - no voice input needed
             .addAction(
                 Action.Builder()
                     .setTitle("📅 Agenda")
