@@ -219,6 +219,34 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         connectionStatus = "Versturen..."
         safeInvalidate()
         
+        // Refresh preferences and send on background thread to avoid blocking main thread
+        scope.launch {
+            try {
+                // Refresh cached values before sending
+                cachedGatewayUrl = preferencesManager.getGatewayUrlSync()
+                cachedGatewayToken = preferencesManager.getGatewayTokenSync()
+                cachedTtsEnabled = preferencesManager.getTtsEnabledSync()
+                
+                // Validate we have required config
+                if (cachedGatewayUrl.isBlank()) {
+                    handleResponse("❌ Gateway URL niet ingesteld - ga naar Instellingen")
+                    return@launch
+                }
+                
+                if (cachedGatewayToken.isBlank()) {
+                    handleResponse("❌ Gateway token niet ingesteld - ga naar Instellingen")
+                    return@launch
+                }
+                
+                sendMessageInternal(message)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error preparing message", e)
+                handleResponse("❌ Fout bij versturen: ${e.localizedMessage ?: "Onbekende fout"}")
+            }
+        }
+    }
+    
+    private fun sendMessageInternal(message: String) {
         // Build conversation context (last 10 messages)
         val contextMessages = messages.takeLast(10).map { msg ->
             mapOf(
@@ -239,24 +267,41 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         
         // Build HTTP URL from gateway URL (convert ws:// to http://, wss:// to https://)
         val httpUrl = try {
-            val uri = java.net.URI(gatewayUrl)
+            val url = cachedGatewayUrl
+            if (url.isBlank()) {
+                handleResponse("❌ Gateway URL niet geconfigureerd")
+                return
+            }
+            val uri = java.net.URI(url)
             val scheme = when (uri.scheme) {
                 "ws" -> "http"
                 "wss" -> "https"
-                else -> uri.scheme
+                else -> uri.scheme ?: "http"
+            }
+            val host = uri.host
+            if (host.isNullOrBlank()) {
+                handleResponse("❌ Ongeldige gateway URL")
+                return
             }
             val port = if (uri.port > 0) uri.port else 18789
-            "$scheme://${uri.host}:$port/hooks/agent"
+            "$scheme://$host:$port/hooks/agent"
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing gateway URL", e)
-            gatewayUrl
+            handleResponse("❌ Ongeldige gateway URL: ${e.localizedMessage}")
+            return
+        }
+        
+        val token = cachedGatewayToken
+        if (token.isBlank()) {
+            handleResponse("❌ Gateway token niet geconfigureerd")
+            return
         }
         
         val request = Request.Builder()
             .url(httpUrl)
             .post(body)
             .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer $gatewayToken")
+            .addHeader("Authorization", "Bearer $token")
             .build()
         
         Log.d(TAG, "Sending conversation message: $message")
@@ -318,8 +363,8 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
                 topic = "chat"
             ))
             
-            // Speak if TTS enabled
-            if (ttsEnabled && ttsReady && tts != null) {
+            // Speak if TTS enabled (using cached value)
+            if (cachedTtsEnabled && ttsReady && tts != null) {
                 try {
                     tts?.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "response")
                 } catch (e: Exception) {
@@ -347,6 +392,13 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun cleanup() {
         isDestroyed.set(true)
+        
+        // Cancel any pending coroutines
+        try {
+            scope.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error canceling coroutine scope", e)
+        }
         
         try {
             tts?.stop()

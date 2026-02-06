@@ -10,7 +10,11 @@ import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.mymate.auto.data.local.PreferencesManager
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -28,15 +32,22 @@ class MessageScreen(
     private val TAG = "MessageScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
     
+    // Coroutine scope for async operations
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private val isDestroyed = AtomicBoolean(false)
     
     private val preferencesManager = PreferencesManager(carContext)
-    private val ttsEnabled: Boolean
-        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
+    
+    // Cached TTS enabled value - loaded asynchronously
+    @Volatile private var cachedTtsEnabled: Boolean = false
     
     init {
+        // Load TTS preference asynchronously
+        loadTtsPreference()
+        
         try {
             tts = TextToSpeech(carContext, this)
         } catch (e: Exception) {
@@ -50,14 +61,31 @@ class MessageScreen(
         })
     }
     
+    private fun loadTtsPreference() {
+        scope.launch {
+            try {
+                cachedTtsEnabled = preferencesManager.getTtsEnabledSync()
+                Log.d(TAG, "TTS preference loaded: $cachedTtsEnabled")
+                
+                // If TTS is ready and enabled, auto-speak
+                if (cachedTtsEnabled && ttsReady) {
+                    mainHandler.post { speakMessage() }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load TTS preference", e)
+            }
+        }
+    }
+    
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             try {
                 val result = tts?.setLanguage(Locale("nl", "NL"))
                 ttsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
                 
-                // Auto-speak if TTS enabled
-                if (ttsEnabled && ttsReady) {
+                // Auto-speak if TTS enabled (using cached value)
+                // Note: cachedTtsEnabled might not be loaded yet, but loadTtsPreference will trigger speak if so
+                if (cachedTtsEnabled && ttsReady) {
                     speakMessage()
                 }
             } catch (e: Exception) {
@@ -147,6 +175,14 @@ class MessageScreen(
     
     private fun cleanup() {
         isDestroyed.set(true)
+        
+        // Cancel any pending coroutines
+        try {
+            scope.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error canceling coroutine scope", e)
+        }
+        
         try {
             tts?.stop()
             tts?.shutdown()
