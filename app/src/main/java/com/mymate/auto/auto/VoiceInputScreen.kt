@@ -26,29 +26,36 @@ class VoiceInputScreen(
     
     override fun onGetTemplate(): Template {
         // Use SearchTemplate for voice input - Android Auto handles the voice recognition
-        return SearchTemplate.Builder(
-            object : SearchTemplate.SearchCallback {
-                override fun onSearchTextChanged(searchText: String) {
-                    Log.d(TAG, "Search text changed: $searchText")
-                    inputText = searchText
-                }
-                
-                override fun onSearchSubmitted(searchText: String) {
-                    Log.d(TAG, "Search submitted: $searchText")
-                    if (searchText.isNotBlank()) {
-                        mainHandler.post {
-                            onMessageReceived(searchText)
-                            screenManager.pop()
-                        }
+        val searchCallback = object : SearchTemplate.SearchCallback {
+            override fun onSearchTextChanged(searchText: String) {
+                Log.d(TAG, "Search text changed: $searchText")
+                inputText = searchText
+            }
+            
+            override fun onSearchSubmitted(searchText: String) {
+                Log.d(TAG, "Search submitted: $searchText")
+                if (searchText.isNotBlank()) {
+                    mainHandler.post {
+                        onMessageReceived(searchText)
+                        screenManager.pop()
                     }
                 }
             }
-        )
+        }
+        
+        // Build ItemList first to ensure it's valid
+        val itemList = buildHintList()
+        Log.d(TAG, "Built ItemList with items for context: $actionContext")
+        
+        // Build the search hint
+        val searchHint = getSearchHint()
+        
+        return SearchTemplate.Builder(searchCallback)
             .setHeaderAction(Action.BACK)
             .setShowKeyboardByDefault(false) // Let voice be primary
             .setInitialSearchText(inputText)
-            .setSearchHint(getSearchHint())
-            .setItemList(buildHintList())
+            .setSearchHint(searchHint)
+            .setItemList(itemList)
             .build()
     }
     
@@ -57,14 +64,29 @@ class VoiceInputScreen(
         
         // Add contextual suggestions based on actionContext
         val suggestions = getContextualSuggestions()
-        suggestions.forEach { (title, subtitle) ->
+        
+        if (suggestions.isEmpty()) {
+            // Fallback: always provide at least one hint to prevent gray area
+            Log.w(TAG, "No suggestions found for context: $actionContext, using defaults")
             builder.addItem(
                 Row.Builder()
-                    .setTitle(title)
-                    .addText(subtitle)
+                    .setTitle("🎤 Spreek of typ je bericht")
+                    .addText("Druk op de microfoon om te beginnen")
                     .build()
             )
+        } else {
+            suggestions.forEach { (title, subtitle) ->
+                builder.addItem(
+                    Row.Builder()
+                        .setTitle(title)
+                        .addText(subtitle)
+                        .build()
+                )
+            }
         }
+        
+        // Set a message for when list is empty (shouldn't happen, but prevents gray area)
+        builder.setNoItemsMessage("Spreek of typ je bericht aan MyMate")
         
         return builder.build()
     }

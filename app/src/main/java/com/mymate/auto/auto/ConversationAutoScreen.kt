@@ -12,7 +12,11 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.gson.Gson
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ConversationMessage
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -28,6 +32,9 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private val mainHandler = Handler(Looper.getMainLooper())
     private val gson = Gson()
     
+    // Coroutine scope for async operations - canceled in cleanup()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -39,14 +46,12 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
-    // runBlocking is acceptable here - these getters are only called from OkHttp's
-    // background callback threads (onResponse/onFailure), never from the main thread
-    private val gatewayUrl: String
-        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
-    private val gatewayToken: String
-        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
-    private val ttsEnabled: Boolean
-        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
+    
+    // Cached values - loaded asynchronously at init, refreshed before each request
+    @Volatile private var cachedGatewayUrl: String = ""
+    @Volatile private var cachedGatewayToken: String = ""
+    @Volatile private var cachedTtsEnabled: Boolean = false
+    private val prefsLoaded = AtomicBoolean(false)
     
     private val isLoading = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
@@ -64,6 +69,9 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private val timeFormat = SimpleDateFormat("HH:mm", Locale("nl", "NL"))
     
     init {
+        // Load preferences asynchronously to avoid blocking main thread
+        loadPreferences()
+        
         try {
             tts = TextToSpeech(carContext, this)
         } catch (e: Exception) {
@@ -75,6 +83,20 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
                 cleanup()
             }
         })
+    }
+    
+    private fun loadPreferences() {
+        scope.launch {
+            try {
+                cachedGatewayUrl = preferencesManager.getGatewayUrlSync()
+                cachedGatewayToken = preferencesManager.getGatewayTokenSync()
+                cachedTtsEnabled = preferencesManager.getTtsEnabledSync()
+                prefsLoaded.set(true)
+                Log.d(TAG, "Preferences loaded successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load preferences", e)
+            }
+        }
     }
     
     override fun onInit(status: Int) {
