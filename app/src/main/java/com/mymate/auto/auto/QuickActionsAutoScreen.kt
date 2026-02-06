@@ -23,8 +23,8 @@ class QuickActionsAutoScreen(
                 .setTitle("📝 Discussie starten")
                 .addText("\"Laten we discussiëren over...\"")
                 .setOnClickListener { 
-                    onActionSelected("Laten we discussiëren over", "discussion")
                     screenManager.pop()
+                    onActionSelected("Laten we discussiëren over", "discussion")
                 }
                 .build()
         )
@@ -34,8 +34,8 @@ class QuickActionsAutoScreen(
                 .setTitle("💡 Brainstormen")
                 .addText("\"Help me brainstormen over...\"")
                 .setOnClickListener { 
-                    onActionSelected("Help me brainstormen over", "brainstorm")
                     screenManager.pop()
+                    onActionSelected("Help me brainstormen over", "brainstorm")
                 }
                 .build()
         )
@@ -45,8 +45,8 @@ class QuickActionsAutoScreen(
                 .setTitle("🔍 Research")
                 .addText("\"Zoek informatie over...\"")
                 .setOnClickListener { 
-                    onActionSelected("Zoek informatie over", "research")
                     screenManager.pop()
+                    onActionSelected("Zoek informatie over", "research")
                 }
                 .build()
         )
@@ -56,8 +56,8 @@ class QuickActionsAutoScreen(
                 .setTitle("💻 Code hulp")
                 .addText("\"Help me met code voor...\"")
                 .setOnClickListener { 
-                    onActionSelected("Help me met code voor", "code")
                     screenManager.pop()
+                    onActionSelected("Help me met code voor", "code")
                 }
                 .build()
         )
@@ -67,8 +67,8 @@ class QuickActionsAutoScreen(
                 .setTitle("📋 Samenvatten")
                 .addText("\"Vat dit samen:...\"")
                 .setOnClickListener { 
-                    onActionSelected("Vat dit samen:", "summarize")
                     screenManager.pop()
+                    onActionSelected("Vat dit samen:", "summarize")
                 }
                 .build()
         )
@@ -78,8 +78,8 @@ class QuickActionsAutoScreen(
                 .setTitle("🎯 Plan maken")
                 .addText("\"Maak een plan voor...\"")
                 .setOnClickListener { 
-                    onActionSelected("Maak een plan voor", "plan")
                     screenManager.pop()
+                    onActionSelected("Maak een plan voor", "plan")
                 }
                 .build()
         )
