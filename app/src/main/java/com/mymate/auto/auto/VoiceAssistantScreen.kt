@@ -136,12 +136,17 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
         )
     }
     
+    /**
+     * Handle user message - uses popToRoot + TTS only to avoid template step limit
+     */
     private fun handleUserMessage(message: String) {
         Log.d(TAG, "User said: ${message.take(50)}...")
         
-        isProcessing = true
-        lastResponse = "🎤 \"${message.take(50)}${if (message.length > 50) "..." else ""}\""
-        invalidate()
+        // Pop back to root immediately to avoid screen stack issues
+        screenManager.popToRoot()
+        
+        // Speak that we're processing
+        ttsManager.speak("Even geduld...")
         
         scope.launch {
             try {
@@ -151,14 +156,8 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                     Log.d(TAG, "Got response: ${response.take(50)}...")
                     
                     mainHandler.post {
-                        lastResponse = response
-                        isProcessing = false
-                        invalidate()
-                        
-                        // Speak the response
-                        Log.d(TAG, "About to speak response: ${response.take(50)}...")
+                        // Just speak the response - no screen updates needed
                         ttsManager.speak(response)
-                        Log.d(TAG, "TTS speak() called")
                     }
                 }
                 
@@ -166,20 +165,14 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                     Log.e(TAG, "Request failed: ${error.message}")
                     
                     mainHandler.post {
-                        lastResponse = "❌ ${error.message ?: "Er ging iets mis"}"
-                        isProcessing = false
-                        invalidate()
-                        
-                        ttsManager.speak("Sorry, er ging iets mis")
+                        ttsManager.speak("Sorry, er ging iets mis: ${error.message ?: "onbekende fout"}")
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Exception: ${e.message}", e)
                 
                 mainHandler.post {
-                    lastResponse = "❌ ${e.message ?: "Onbekende fout"}"
-                    isProcessing = false
-                    invalidate()
+                    ttsManager.speak("Sorry, er ging iets mis")
                 }
             }
         }
