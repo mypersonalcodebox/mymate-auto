@@ -46,7 +46,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("📝 Discussie starten")
                 .addText("\"Laten we discussiëren over...\"")
                 .setOnClickListener { 
-                    openTemplatedVoice("Laten we discussiëren over")
+                    openTemplatedVoice("Laten we discussiëren over", "discussion")
                 }
                 .build()
         )
@@ -56,7 +56,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("💡 Brainstormen")
                 .addText("\"Help me brainstormen over...\"")
                 .setOnClickListener { 
-                    openTemplatedVoice("Help me brainstormen over")
+                    openTemplatedVoice("Help me brainstormen over", "brainstorm")
                 }
                 .build()
         )
@@ -66,7 +66,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("🔍 Research")
                 .addText("\"Zoek informatie over...\"")
                 .setOnClickListener { 
-                    openTemplatedVoice("Zoek informatie over")
+                    openTemplatedVoice("Zoek informatie over", "research")
                 }
                 .build()
         )
@@ -76,7 +76,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("💻 Code hulp")
                 .addText("\"Help me met code voor...\"")
                 .setOnClickListener { 
-                    openTemplatedVoice("Help me met code voor")
+                    openTemplatedVoice("Help me met code voor", "code")
                 }
                 .build()
         )
@@ -86,7 +86,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("🎯 Plan maken")
                 .addText("\"Maak een plan voor...\"")
                 .setOnClickListener { 
-                    openTemplatedVoice("Maak een plan voor")
+                    openTemplatedVoice("Maak een plan voor", "plan")
                 }
                 .build()
         )
@@ -101,10 +101,13 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
     /**
      * Open voice input with a template prefix
      * User speaks to complete, then full message is sent
+     * 
+     * @param prefix The text prefix to prepend to user input
+     * @param context The VoiceInputScreen context for appropriate hints
      */
-    private fun openTemplatedVoice(prefix: String) {
+    private fun openTemplatedVoice(prefix: String, context: String) {
         screenManager.push(
-            VoiceInputScreen(carContext, "template") { userInput ->
+            VoiceInputScreen(carContext, context) { userInput ->
                 val fullMessage = "$prefix $userInput"
                 sendMessageAndShowResponse(fullMessage)
             }

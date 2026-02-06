@@ -168,6 +168,7 @@ class VoiceInputScreen(
             "brainstorm" -> "...brainstormen over?"
             "research" -> "...informatie over?"
             "code" -> "...code voor?"
+            "plan" -> "...een plan voor?"
             // Other contexts
             "start_task" -> "Beschrijf de taak..."
             "github_issue" -> "Beschrijf de issue..."
