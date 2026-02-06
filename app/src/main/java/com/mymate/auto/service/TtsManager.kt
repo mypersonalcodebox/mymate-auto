@@ -178,6 +178,7 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to abandon audio focus: ${e.message}")
         }
+    }
     
     /**
      * Add text to the speech queue
