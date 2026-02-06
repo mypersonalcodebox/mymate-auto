@@ -1,6 +1,10 @@
 package com.mymate.auto.service
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -12,6 +16,8 @@ import java.util.UUID
 
 /**
  * Text-to-Speech manager for reading responses aloud
+ * 
+ * Handles audio focus for Android Auto compatibility.
  */
 class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     
@@ -29,6 +35,19 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
     }
     
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext, this)
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    
+    private val audioFocusRequest: AudioFocusRequest? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener { /* ignore focus changes */ }
+            .build()
+    } else null
     
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady
@@ -64,16 +83,19 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
                 
                 override fun onDone(utteranceId: String?) {
                     _isSpeaking.value = false
+                    abandonAudioFocus()
                 }
                 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
                     _isSpeaking.value = false
+                    abandonAudioFocus()
                     Log.e(TAG, "TTS error for utterance: $utteranceId")
                 }
                 
                 override fun onError(utteranceId: String?, errorCode: Int) {
                     _isSpeaking.value = false
+                    abandonAudioFocus()
                     Log.e(TAG, "TTS error $errorCode for utterance: $utteranceId")
                 }
             })
@@ -121,8 +143,41 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         
         Log.d(TAG, "Speaking: ${textToSpeak.take(50)}...")
         
+        // Request audio focus for Android Auto compatibility
+        requestAudioFocus()
+        
         tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
+    
+    @Suppress("DEPRECATION")
+    private fun requestAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+                audioManager.requestAudioFocus(audioFocusRequest)
+            } else {
+                audioManager.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                )
+            }
+            Log.d(TAG, "Audio focus requested")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to request audio focus: ${e.message}")
+        }
+    }
+    
+    private fun abandonAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to abandon audio focus: ${e.message}")
+        }
     
     /**
      * Add text to the speech queue
