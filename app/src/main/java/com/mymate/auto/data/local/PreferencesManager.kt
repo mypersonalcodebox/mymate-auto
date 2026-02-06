@@ -19,6 +19,7 @@ class PreferencesManager(private val context: Context) {
     companion object {
         val WEBHOOK_URL = stringPreferencesKey("webhook_url")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
+        val TTS_SPEED = floatPreferencesKey("tts_speed") // 0.75 = slow, 1.0 = normal, 1.25 = fast
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val WEBSOCKET_ENABLED = booleanPreferencesKey("websocket_enabled")
         val ACTION_USAGE = stringPreferencesKey("action_usage")
@@ -272,6 +273,16 @@ class PreferencesManager(private val context: Context) {
     
     suspend fun getTtsEnabledSync(): Boolean {
         return context.dataStore.data.first()[TTS_ENABLED] ?: true
+    }
+    
+    suspend fun getTtsSpeedSync(): Float {
+        return context.dataStore.data.first()[TTS_SPEED] ?: 1.0f
+    }
+    
+    suspend fun setTtsSpeed(speed: Float) {
+        context.dataStore.edit { prefs ->
+            prefs[TTS_SPEED] = speed
+        }
     }
     
     // Parking settings

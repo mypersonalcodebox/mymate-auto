@@ -149,6 +149,17 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
     
+    /**
+     * Set speech rate
+     * @param speed 0.75 = slow, 1.0 = normal, 1.25 = fast
+     */
+    fun setSpeed(speed: Float) {
+        if (initialized) {
+            tts.setSpeechRate(speed.coerceIn(0.5f, 2.0f))
+            Log.d(TAG, "TTS speed set to: $speed")
+        }
+    }
+    
     @Suppress("DEPRECATION")
     private fun requestAudioFocus() {
         try {
