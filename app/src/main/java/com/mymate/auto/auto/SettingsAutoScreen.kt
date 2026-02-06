@@ -57,14 +57,14 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // 4. Quick Actions (frequently used commands)
+        // 4. Voice Assistant (main feature)
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("⚡ Quick Actions")
-                .addText("Snelle commando's")
+                .setTitle("🎤 Voice Assistant")
+                .addText("Praat met MyMate")
                 .setBrowsable(true)
                 .setOnClickListener {
-                    screenManager.push(QuickActionsScreen(carContext))
+                    screenManager.push(VoiceAssistantScreen(carContext))
                 }
                 .build()
         )
