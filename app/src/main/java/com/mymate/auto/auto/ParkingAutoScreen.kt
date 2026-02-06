@@ -24,10 +24,11 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 /**
- * Rock-solid simple parking screen with just 3 things:
+ * Rock-solid simple parking screen with just 2 things:
  * 1. "📍 Locatie opslaan" button - saves current GPS
- * 2. "🚶 Navigeer naar auto" button - opens Google Maps walking
- * 3. Shows last saved location info (address + time)
+ * 2. Shows last saved location info (address + time)
+ * 
+ * Note: "Navigeer naar auto" is only in phone app (useless when you're in the car!)
  */
 class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
     
@@ -95,20 +96,11 @@ class ParkingAutoScreen(carContext: CarContext) : Screen(carContext) {
             val address = parking.address ?: "Onbekend adres"
             val timeAgo = getTimeAgo(parking.timestamp)
             
-            // Show saved location info
+            // Show saved location info (no navigate button - you're already in the car!)
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle("🚗 $address")
                     .addText("Geparkeerd $timeAgo")
-                    .build()
-            )
-            
-            // Navigate button
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("🚶 Navigeer naar auto")
-                    .addText("Open Google Maps wandelroute")
-                    .setOnClickListener { navigateToParking(parking) }
                     .build()
             )
         } else {
