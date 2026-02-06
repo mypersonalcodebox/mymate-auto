@@ -229,7 +229,9 @@ class PreferencesManager(private val context: Context) {
     }
     
     suspend fun getIsConfiguredSync(): Boolean {
-        return context.dataStore.data.first()[IS_CONFIGURED] ?: false
+        // Default to true since we have working hardcoded defaults for personal use
+        // New users can still go to Settings to change gateway URL/token if needed
+        return context.dataStore.data.first()[IS_CONFIGURED] ?: true
     }
     
     // Action usage tracking
