@@ -2,6 +2,7 @@ package com.mymate.auto
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,19 +35,17 @@ import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
     
-    private val requestCalendarPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* Permission result handled - calendar will work if granted */ }
+    // Request multiple permissions at once
+    private val requestPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* Results handled - features will work if granted */ }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Request calendar permission if not granted
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) 
-            != PackageManager.PERMISSION_GRANTED) {
-            requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
-        }
+        // Request all needed permissions
+        requestAllPermissions()
         
         val preferencesManager = PreferencesManager(this)
         
@@ -177,6 +176,49 @@ fun MyMateApp(startDestination: String = "chat") {
                     navController.popBackStack()
                 }
             )
+        }
+    }
+    
+    private fun requestAllPermissions() {
+        val permissionsNeeded = mutableListOf<String>()
+        
+        // Calendar - for agenda feature
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.READ_CALENDAR)
+        }
+        
+        // Location - for parking feature
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        // Bluetooth - for auto-save parking (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+        }
+        
+        // Notifications (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        
+        // Microphone - for voice input
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.RECORD_AUDIO)
+        }
+        
+        // Request all at once if any needed
+        if (permissionsNeeded.isNotEmpty()) {
+            requestPermissions.launch(permissionsNeeded.toTypedArray())
         }
     }
 }
