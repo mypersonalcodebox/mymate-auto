@@ -15,29 +15,23 @@ import java.net.URLEncoder
 
 /**
  * Agenda screen for Android Auto - shows today's and tomorrow's events.
- * Simple list view with navigation option for events with location.
+ * Simple read-only list with navigation for events with location.
  */
 class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
     
     private val TAG = "AgendaAutoScreen"
-    private val supervisorJob = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val ttsManager = TtsManager.getInstance(carContext)
     
-    @Volatile
-    private var isLoading = true
-    
-    @Volatile
-    private var todayEvents: List<CalendarHelper.CalendarEvent> = emptyList()
-    
-    @Volatile
-    private var tomorrowEvents: List<CalendarHelper.CalendarEvent> = emptyList()
+    @Volatile private var isLoading = true
+    @Volatile private var todayEvents: List<CalendarHelper.CalendarEvent> = emptyList()
+    @Volatile private var tomorrowEvents: List<CalendarHelper.CalendarEvent> = emptyList()
     
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 ttsManager.stop()
-                supervisorJob.cancel()
+                scope.cancel()
             }
         })
         loadEvents()
@@ -50,10 +44,11 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                 tomorrowEvents = CalendarHelper.getTomorrowEvents(carContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading events", e)
-            }
-            isLoading = false
-            withContext(Dispatchers.Main) {
-                invalidate()
+                todayEvents = emptyList()
+                tomorrowEvents = emptyList()
+            } finally {
+                isLoading = false
+                withContext(Dispatchers.Main) { invalidate() }
             }
         }
     }
@@ -66,72 +61,84 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         }
         
-        val listBuilder = ItemList.Builder()
-        var itemCount = 0
-        val maxItems = 6 // Android Auto limit
+        // Empty state: no events at all
+        if (todayEvents.isEmpty() && tomorrowEvents.isEmpty()) {
+            return MessageTemplate.Builder("Geen afspraken voor vandaag of morgen")
+                .setTitle("📅 Agenda")
+                .setHeaderAction(Action.BACK)
+                .setActionStrip(buildActionStrip())
+                .build()
+        }
+        
+        return ListTemplate.Builder()
+            .setTitle("📅 Agenda")
+            .setHeaderAction(Action.BACK)
+            .setSingleList(buildEventList())
+            .setActionStrip(buildActionStrip())
+            .build()
+    }
+    
+    private fun buildEventList(): ItemList {
+        val builder = ItemList.Builder()
+        var count = 0
+        val maxItems = 6
         
         // Today's events
         if (todayEvents.isEmpty()) {
-            if (itemCount < maxItems) {
-                listBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("Vandaag")
-                        .addText("Geen afspraken")
-                        .build()
-                )
-                itemCount++
-            }
-        } else {
-            todayEvents.forEach { event ->
-                if (itemCount >= maxItems) return@forEach
-                val locationIcon = if (event.hasLocation()) " 📍" else ""
-                listBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("${event.getTimeRange()}$locationIcon")
-                        .addText(event.title)
-                        .apply {
-                            if (event.hasLocation()) {
-                                setOnClickListener { navigateToEvent(event) }
-                                setBrowsable(true)
-                            }
-                        }
-                        .build()
-                )
-                itemCount++
-            }
-        }
-        
-        // Tomorrow's events (only if space left)
-        if (itemCount < maxItems && tomorrowEvents.isNotEmpty()) {
-            tomorrowEvents.forEach { event ->
-                if (itemCount >= maxItems) return@forEach
-                val locationIcon = if (event.hasLocation()) " 📍" else ""
-                listBuilder.addItem(
-                    Row.Builder()
-                        .setTitle("Morgen ${event.getTimeRange()}$locationIcon")
-                        .addText(event.title)
-                        .apply {
-                            if (event.hasLocation()) {
-                                setOnClickListener { navigateToEvent(event) }
-                                setBrowsable(true)
-                            }
-                        }
-                        .build()
-                )
-                itemCount++
-            }
-        } else if (itemCount < maxItems && tomorrowEvents.isEmpty()) {
-            listBuilder.addItem(
+            builder.addItem(
                 Row.Builder()
-                    .setTitle("Morgen")
+                    .setTitle("Vandaag")
                     .addText("Geen afspraken")
                     .build()
             )
-            itemCount++
+            count++
+        } else {
+            todayEvents.forEach { event ->
+                if (count >= maxItems) return@forEach
+                builder.addItem(buildEventRow(event, prefix = null))
+                count++
+            }
         }
         
-        // Build ActionStrip with TTS button
-        val actionStrip = ActionStrip.Builder()
+        // Tomorrow's events (only if space)
+        if (count < maxItems) {
+            if (tomorrowEvents.isEmpty()) {
+                builder.addItem(
+                    Row.Builder()
+                        .setTitle("Morgen")
+                        .addText("Geen afspraken")
+                        .build()
+                )
+            } else {
+                tomorrowEvents.forEach { event ->
+                    if (count >= maxItems) return@forEach
+                    builder.addItem(buildEventRow(event, prefix = "Morgen"))
+                    count++
+                }
+            }
+        }
+        
+        return builder.build()
+    }
+    
+    private fun buildEventRow(event: CalendarHelper.CalendarEvent, prefix: String?): Row {
+        val timeText = if (prefix != null) "$prefix ${event.getTimeRange()}" else event.getTimeRange()
+        val locationIcon = if (event.hasLocation()) " 📍" else ""
+        
+        return Row.Builder()
+            .setTitle("$timeText$locationIcon")
+            .addText(event.title)
+            .apply {
+                if (event.hasLocation()) {
+                    setOnClickListener { navigateToEvent(event) }
+                    setBrowsable(true)
+                }
+            }
+            .build()
+    }
+    
+    private fun buildActionStrip(): ActionStrip {
+        return ActionStrip.Builder()
             .addAction(
                 Action.Builder()
                     .setTitle("🔊 Lees voor")
@@ -139,68 +146,51 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
                     .build()
             )
             .build()
-        
-        return ListTemplate.Builder()
-            .setTitle("📅 Agenda")
-            .setHeaderAction(Action.BACK)
-            .setSingleList(listBuilder.build())
-            .setActionStrip(actionStrip)
-            .build()
     }
     
-    /**
-     * Speak the agenda using TTS
-     */
     private fun speakAgenda() {
-        val sb = StringBuilder()
-        
-        // Today's events
-        if (todayEvents.isEmpty()) {
-            sb.append("Je hebt vandaag geen afspraken. ")
-        } else {
-            sb.append("Vandaag heb je ${todayEvents.size} afspraak${if (todayEvents.size > 1) "en" else ""}. ")
-            todayEvents.forEach { event ->
-                sb.append("${event.getTimeRange()}, ${event.title}. ")
-                if (event.hasLocation()) {
-                    sb.append("Locatie: ${event.location}. ")
+        val text = buildString {
+            // Today
+            if (todayEvents.isEmpty()) {
+                append("Je hebt vandaag geen afspraken. ")
+            } else {
+                append("Vandaag heb je ${todayEvents.size} afspraak${if (todayEvents.size > 1) "en" else ""}. ")
+                todayEvents.forEach { event ->
+                    append("${event.getTimeRange()}, ${event.title}. ")
+                    if (event.hasLocation()) append("Locatie: ${event.location}. ")
+                }
+            }
+            
+            // Tomorrow
+            if (tomorrowEvents.isEmpty()) {
+                append("Morgen heb je geen afspraken.")
+            } else {
+                append("Morgen heb je ${tomorrowEvents.size} afspraak${if (tomorrowEvents.size > 1) "en" else ""}. ")
+                tomorrowEvents.forEach { event ->
+                    append("${event.getTimeRange()}, ${event.title}. ")
+                    if (event.hasLocation()) append("Locatie: ${event.location}. ")
                 }
             }
         }
         
-        // Tomorrow's events
-        if (tomorrowEvents.isEmpty()) {
-            sb.append("Morgen heb je geen afspraken.")
-        } else {
-            sb.append("Morgen heb je ${tomorrowEvents.size} afspraak${if (tomorrowEvents.size > 1) "en" else ""}. ")
-            tomorrowEvents.forEach { event ->
-                sb.append("${event.getTimeRange()}, ${event.title}. ")
-                if (event.hasLocation()) {
-                    sb.append("Locatie: ${event.location}. ")
-                }
-            }
-        }
-        
-        ttsManager.speak(sb.toString(), stripMarkdown = false)
+        ttsManager.speak(text, stripMarkdown = false)
     }
     
     private fun navigateToEvent(event: CalendarHelper.CalendarEvent) {
         val location = event.location ?: return
         
         try {
-            // Try Google Maps navigation
-            val encodedLocation = URLEncoder.encode(location, "UTF-8")
-            val uri = Uri.parse("google.navigation:q=$encodedLocation")
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+            val encoded = URLEncoder.encode(location, "UTF-8")
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=$encoded")).apply {
                 setPackage("com.google.android.apps.maps")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             carContext.startCarApp(intent)
         } catch (e: Exception) {
-            // Fallback to geo URI
+            Log.w(TAG, "Google Maps nav failed, trying geo URI", e)
             try {
-                val encodedLocation = URLEncoder.encode(location, "UTF-8")
-                val uri = Uri.parse("geo:0,0?q=$encodedLocation")
-                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                val encoded = URLEncoder.encode(location, "UTF-8")
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$encoded")).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 carContext.startCarApp(intent)
