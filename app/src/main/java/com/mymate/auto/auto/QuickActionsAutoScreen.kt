@@ -17,6 +17,18 @@ class QuickActionsAutoScreen(
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
+        // Quick direct actions
+        listBuilder.addItem(
+            Row.Builder()
+                .setTitle("📅 Agenda")
+                .addText("Bekijk je afspraken van vandaag")
+                .setOnClickListener { 
+                    screenManager.pop()
+                    onActionSelected("Wat staat er vandaag op mijn agenda?", "direct")
+                }
+                .build()
+        )
+        
         // Template actions - user speaks to complete
         listBuilder.addItem(
             Row.Builder()
@@ -58,17 +70,6 @@ class QuickActionsAutoScreen(
                 .setOnClickListener { 
                     screenManager.pop()
                     onActionSelected("Help me met code voor", "code")
-                }
-                .build()
-        )
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📋 Samenvatten")
-                .addText("\"Vat dit samen:...\"")
-                .setOnClickListener { 
-                    screenManager.pop()
-                    onActionSelected("Vat dit samen:", "summarize")
                 }
                 .build()
         )

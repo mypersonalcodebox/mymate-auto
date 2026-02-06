@@ -96,15 +96,8 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         
-        // Quick action buttons - PaneTemplate allows max 2 actions!
-        // Use one for direct action, one for submenu with more options
+        // PaneTemplate ActionStrip allows only 1 custom action!
         val actionStrip = ActionStrip.Builder()
-            .addAction(
-                Action.Builder()
-                    .setTitle("📅 Agenda")
-                    .setOnClickListener { sendQuickMessage("Wat staat er vandaag op mijn agenda?") }
-                    .build()
-            )
             .addAction(
                 Action.Builder()
                     .setTitle("⚡ Meer")
