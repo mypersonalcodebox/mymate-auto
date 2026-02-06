@@ -9,49 +9,31 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.google.gson.Gson
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ConversationMessage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancel
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * Conversation screen for Android Auto - uses WebSocket for real-time responses
+ */
 class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
     
     private val TAG = "ConversationAutoScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val gson = Gson()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    // Coroutine scope for async operations - canceled in cleanup()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
+    // Use shared WebSocket client for real-time responses
+    private val agentClient = AutoAgentClient.getInstance(carContext)
     
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
-    
-    // Cached values - loaded asynchronously at init, refreshed before each request
-    @Volatile private var cachedGatewayUrl: String = ""
-    @Volatile private var cachedGatewayToken: String = ""
-    @Volatile private var cachedTtsEnabled: Boolean = false
-    private val prefsLoaded = AtomicBoolean(false)
+    private val ttsEnabled: Boolean
+        get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
     private val isLoading = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
@@ -60,7 +42,7 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private var messages: MutableList<ConversationMessage> = mutableListOf()
     
     @Volatile
-    private var connectionStatus = "Gereed"
+    private var connectionStatus = "Verbinden..."
     
     @Volatile
     private var lastResponse: String? = null
@@ -69,9 +51,6 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     private val timeFormat = SimpleDateFormat("HH:mm", Locale("nl", "NL"))
     
     init {
-        // Load preferences asynchronously to avoid blocking main thread
-        loadPreferences()
-        
         try {
             tts = TextToSpeech(carContext, this)
         } catch (e: Exception) {
@@ -83,18 +62,16 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
                 cleanup()
             }
         })
-    }
-    
-    private fun loadPreferences() {
+        
+        // Monitor connection state
         scope.launch {
-            try {
-                cachedGatewayUrl = preferencesManager.getGatewayUrlSync()
-                cachedGatewayToken = preferencesManager.getGatewayTokenSync()
-                cachedTtsEnabled = preferencesManager.getTtsEnabledSync()
-                prefsLoaded.set(true)
-                Log.d(TAG, "Preferences loaded successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load preferences", e)
+            agentClient.connectionState.collect { state ->
+                mainHandler.post {
+                    connectionStatus = agentClient.getStatusText()
+                    if (!isDestroyed.get()) {
+                        safeInvalidate()
+                    }
+                }
             }
         }
     }
@@ -219,131 +196,32 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
         connectionStatus = "Versturen..."
         safeInvalidate()
         
-        // Refresh preferences and send on background thread to avoid blocking main thread
+        Log.d(TAG, "Sending conversation message via WebSocket: $message")
+        
+        // Send via WebSocket for real-time response
         scope.launch {
-            try {
-                // Refresh cached values before sending
-                cachedGatewayUrl = preferencesManager.getGatewayUrlSync()
-                cachedGatewayToken = preferencesManager.getGatewayTokenSync()
-                cachedTtsEnabled = preferencesManager.getTtsEnabledSync()
-                
-                // Validate we have required config
-                if (cachedGatewayUrl.isBlank()) {
-                    handleResponse("❌ Gateway URL niet ingesteld - ga naar Instellingen")
-                    return@launch
-                }
-                
-                if (cachedGatewayToken.isBlank()) {
-                    handleResponse("❌ Gateway token niet ingesteld - ga naar Instellingen")
-                    return@launch
-                }
-                
-                sendMessageInternal(message)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error preparing message", e)
-                handleResponse("❌ Fout bij versturen: ${e.localizedMessage ?: "Onbekende fout"}")
-            }
-        }
-    }
-    
-    private fun sendMessageInternal(message: String) {
-        // Build conversation context (last 10 messages)
-        val contextMessages = messages.takeLast(10).map { msg ->
-            mapOf(
-                "role" to if (msg.isFromUser) "user" else "assistant",
-                "content" to msg.content
-            )
-        }
-        
-        val requestBody = mapOf(
-            "message" to message,
-            "sessionKey" to sessionKey,
-            "context" to contextMessages,
-            "source" to "android_auto_conversation"
-        )
-        
-        val json = gson.toJson(requestBody)
-        val body = json.toRequestBody("application/json".toMediaType())
-        
-        // Build HTTP URL from gateway URL (convert ws:// to http://, wss:// to https://)
-        val httpUrl = try {
-            val url = cachedGatewayUrl
-            if (url.isBlank()) {
-                handleResponse("❌ Gateway URL niet geconfigureerd")
-                return
-            }
-            val uri = java.net.URI(url)
-            val scheme = when (uri.scheme) {
-                "ws" -> "http"
-                "wss" -> "https"
-                else -> uri.scheme ?: "http"
-            }
-            val host = uri.host
-            if (host.isNullOrBlank()) {
-                handleResponse("❌ Ongeldige gateway URL")
-                return
-            }
-            val port = if (uri.port > 0) uri.port else 18789
-            "$scheme://$host:$port/hooks/agent"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing gateway URL", e)
-            handleResponse("❌ Ongeldige gateway URL: ${e.localizedMessage}")
-            return
-        }
-        
-        val token = cachedGatewayToken
-        if (token.isBlank()) {
-            handleResponse("❌ Gateway token niet geconfigureerd")
-            return
-        }
-        
-        val request = Request.Builder()
-            .url(httpUrl)
-            .post(body)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        
-        Log.d(TAG, "Sending conversation message: $message")
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Request failed", e)
-                handleResponse("❌ Verbindingsfout: ${e.localizedMessage ?: "Onbekende fout"}")
-            }
+            val result = agentClient.sendMessage(message, sessionKey)
             
-            override fun onResponse(call: Call, response: Response) {
-                Log.d(TAG, "Got response: ${response.code}")
-                
-                if (!response.isSuccessful) {
-                    val errorMsg = when (response.code) {
-                        401 -> "❌ Authenticatie mislukt - controleer je token in Instellingen"
-                        403 -> "❌ Geen toegang - controleer je configuratie"
-                        404 -> "❌ Gateway niet gevonden"
-                        500, 502, 503 -> "❌ Server fout - probeer later opnieuw"
-                        else -> "❌ Fout: HTTP ${response.code}"
+            result.fold(
+                onSuccess = { reply ->
+                    handleResponse(reply)
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "Request failed", error)
+                    val errorMsg = when {
+                        error.message?.contains("timeout", ignoreCase = true) == true ->
+                            "❌ Timeout - geen antwoord ontvangen"
+                        error.message?.contains("token", ignoreCase = true) == true ->
+                            "❌ Authenticatie mislukt - controleer je token"
+                        error.message?.contains("verbonden", ignoreCase = true) == true ->
+                            "❌ ${error.message}"
+                        else ->
+                            "❌ Fout: ${error.localizedMessage ?: "Onbekende fout"}"
                     }
                     handleResponse(errorMsg)
-                    return
                 }
-                
-                val responseText = try {
-                    response.body?.use { body ->
-                        val responseBody = body.string()
-                        val result = gson.fromJson(responseBody, Map::class.java)
-                        result["reply"]?.toString() 
-                            ?: result["message"]?.toString()
-                            ?: result["text"]?.toString()
-                            ?: "Geen antwoord"
-                    } ?: "Leeg antwoord"
-                } catch (e: Exception) {
-                    Log.e(TAG, "Parse error", e)
-                    "Fout bij verwerken antwoord"
-                }
-                
-                handleResponse(responseText)
-            }
-        })
+            )
+        }
     }
     
     private fun handleResponse(responseText: String) {
@@ -352,7 +230,7 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
             
             lastResponse = responseText
             isLoading.set(false)
-            connectionStatus = "Gereed"
+            connectionStatus = agentClient.getStatusText()
             
             // Add assistant message
             messages.add(ConversationMessage(
@@ -363,8 +241,8 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
                 topic = "chat"
             ))
             
-            // Speak if TTS enabled (using cached value)
-            if (cachedTtsEnabled && ttsReady && tts != null) {
+            // Speak if TTS enabled
+            if (ttsEnabled && ttsReady && tts != null) {
                 try {
                     tts?.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "response")
                 } catch (e: Exception) {
@@ -392,13 +270,7 @@ class ConversationAutoScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun cleanup() {
         isDestroyed.set(true)
-        
-        // Cancel any pending coroutines
-        try {
-            scope.cancel()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error canceling coroutine scope", e)
-        }
+        scope.cancel()
         
         try {
             tts?.stop()

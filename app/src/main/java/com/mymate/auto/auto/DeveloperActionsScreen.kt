@@ -9,47 +9,31 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.google.gson.Gson
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.ConversationMessage
 import com.mymate.auto.data.model.QuickActions
-import kotlinx.coroutines.runBlocking
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Developer Actions Screen - Chat-like interface for dev commands
- * 
- * Shows available dev actions as context, lets you give voice commands,
- * and keeps command history visible like a chat.
+ * Uses WebSocket for real-time responses
  */
 class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
     
     private val TAG = "DeveloperActionsScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val gson = Gson()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
+    // Use shared WebSocket client for real-time responses
+    private val agentClient = AutoAgentClient.getInstance(carContext)
     
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
-    private val gatewayUrl: String
-        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
-    private val gatewayToken: String
-        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
     private val ttsEnabled: Boolean
         get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
@@ -61,7 +45,7 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
     private var commandHistory: MutableList<ConversationMessage> = mutableListOf()
     
     @Volatile
-    private var connectionStatus = "Klaar voor dev opdrachten"
+    private var connectionStatus = "Verbinden..."
     
     private val sessionKey = "agent:main:mymate:developer:auto"
     private val timeFormat = SimpleDateFormat("HH:mm", Locale("nl", "NL"))
@@ -81,6 +65,18 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
                 cleanup()
             }
         })
+        
+        // Monitor connection state
+        scope.launch {
+            agentClient.connectionState.collect { state ->
+                mainHandler.post {
+                    connectionStatus = agentClient.getStatusText()
+                    if (!isDestroyed.get()) {
+                        safeInvalidate()
+                    }
+                }
+            }
+        }
     }
     
     override fun onInit(status: Int) {
@@ -205,7 +201,7 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
                     .setOnClickListener {
                         commandHistory.clear()
                         usedActions.clear()
-                        connectionStatus = "Klaar voor dev opdrachten"
+                        connectionStatus = agentClient.getStatusText()
                         invalidate()
                     }
                     .build()
@@ -254,88 +250,32 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
         connectionStatus = "Versturen..."
         safeInvalidate()
         
-        // Build context from recent commands (last 6)
-        val contextMessages = commandHistory.takeLast(6).map { msg ->
-            mapOf(
-                "role" to if (msg.isFromUser) "user" else "assistant",
-                "content" to msg.content
-            )
-        }
+        Log.d(TAG, "Sending dev command via WebSocket: $command (action: $actionId)")
         
-        val requestBody = mapOf(
-            "message" to command,
-            "sessionKey" to sessionKey,
-            "context" to contextMessages,
-            "action" to actionId,
-            "category" to "developer",
-            "source" to "android_auto_developer"
-        )
-        
-        val json = gson.toJson(requestBody)
-        val body = json.toRequestBody("application/json".toMediaType())
-        
-        // Build HTTP URL from gateway URL
-        val httpUrl = try {
-            val uri = java.net.URI(gatewayUrl)
-            val scheme = when (uri.scheme) {
-                "ws" -> "http"
-                "wss" -> "https"
-                else -> uri.scheme
-            }
-            val port = if (uri.port > 0) uri.port else 18789
-            "$scheme://${uri.host}:$port/hooks/agent"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing gateway URL", e)
-            gatewayUrl
-        }
-        
-        val request = Request.Builder()
-            .url(httpUrl)
-            .post(body)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer $gatewayToken")
-            .build()
-        
-        Log.d(TAG, "Sending dev command: $command (action: $actionId)")
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Request failed", e)
-                handleResponse("❌ Verbindingsfout: ${e.localizedMessage ?: "Onbekende fout"}")
-            }
+        // Send via WebSocket for real-time response
+        scope.launch {
+            val result = agentClient.sendMessage(command, sessionKey)
             
-            override fun onResponse(call: Call, response: Response) {
-                Log.d(TAG, "Got response: ${response.code}")
-                
-                if (!response.isSuccessful) {
-                    val errorMsg = when (response.code) {
-                        401 -> "❌ Authenticatie mislukt - check je token"
-                        403 -> "❌ Geen toegang"
-                        404 -> "❌ Gateway niet gevonden"
-                        500, 502, 503 -> "❌ Server fout - probeer later"
-                        else -> "❌ Fout: HTTP ${response.code}"
+            result.fold(
+                onSuccess = { reply ->
+                    handleResponse(reply)
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "Request failed", error)
+                    val errorMsg = when {
+                        error.message?.contains("timeout", ignoreCase = true) == true ->
+                            "❌ Timeout - geen antwoord ontvangen"
+                        error.message?.contains("token", ignoreCase = true) == true ->
+                            "❌ Authenticatie mislukt - check je token"
+                        error.message?.contains("verbonden", ignoreCase = true) == true ->
+                            "❌ ${error.message}"
+                        else ->
+                            "❌ Fout: ${error.localizedMessage ?: "Onbekende fout"}"
                     }
                     handleResponse(errorMsg)
-                    return
                 }
-                
-                val responseText = try {
-                    response.body?.use { body ->
-                        val responseBody = body.string()
-                        val result = gson.fromJson(responseBody, Map::class.java)
-                        result["reply"]?.toString()
-                            ?: result["message"]?.toString()
-                            ?: result["text"]?.toString()
-                            ?: "Geen antwoord"
-                    } ?: "Leeg antwoord"
-                } catch (e: Exception) {
-                    Log.e(TAG, "Parse error", e)
-                    "Fout bij verwerken antwoord"
-                }
-                
-                handleResponse(responseText)
-            }
-        })
+            )
+        }
     }
     
     private fun handleResponse(responseText: String) {
@@ -343,7 +283,7 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
             if (isDestroyed.get()) return@post
             
             isLoading.set(false)
-            connectionStatus = "Klaar voor dev opdrachten"
+            connectionStatus = agentClient.getStatusText()
             
             // Add response to history
             commandHistory.add(ConversationMessage(
@@ -383,6 +323,7 @@ class DeveloperActionsScreen(carContext: CarContext) : Screen(carContext), TextT
     
     private fun cleanup() {
         isDestroyed.set(true)
+        scope.cancel()
         
         try {
             tts?.stop()

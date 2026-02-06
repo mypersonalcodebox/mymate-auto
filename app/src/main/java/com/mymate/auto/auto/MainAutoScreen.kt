@@ -9,18 +9,11 @@ import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.mymate.auto.data.local.PreferencesManager
 import com.mymate.auto.data.model.QuickAction
 import com.mymate.auto.data.model.QuickActions
-import kotlinx.coroutines.runBlocking
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
+import kotlinx.coroutines.*
 import java.util.*
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
@@ -28,20 +21,10 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
     private val TAG = "MainAutoScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
     
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
-    private val gson = Gson()
-    
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
-    private val webhookUrl: String
-        get() = runBlocking { preferencesManager.getWebhookUrlSync() }
     private val ttsEnabled: Boolean
         get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
@@ -204,137 +187,25 @@ class MainAutoScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.
         }
     }
     
-    private fun sendMessage(message: String, quickActionId: String?) {
-        if (!isLoading.compareAndSet(false, true)) {
-            Log.w(TAG, "Already loading, ignoring request")
-            return
-        }
-        
-        safeInvalidate()
-        
-        val json = gson.toJson(mapOf(
-            "message" to message,
-            "action" to (quickActionId ?: "chat"),
-            "source" to "android_auto"
-        ))
-        val body = json.toRequestBody("application/json".toMediaType())
-        
-        val request = Request.Builder()
-            .url(webhookUrl)
-            .post(body)
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        Log.d(TAG, "Sending message: $message")
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Request failed", e)
-                handleResponse("❌ Verbindingsfout: ${e.localizedMessage ?: "Onbekende fout"}")
-            }
-            
-            override fun onResponse(call: Call, response: Response) {
-                Log.d(TAG, "Got response: ${response.code}")
-                
-                val responseText = try {
-                    response.body?.use { body ->
-                        val responseBody = body.string()
-                        
-                        // Check HTTP status before parsing
-                        if (!response.isSuccessful) {
-                            Log.e(TAG, "HTTP error ${response.code}: $responseBody")
-                            when (response.code) {
-                                401 -> "❌ Token onjuist"
-                                403 -> "❌ Geen toegang"
-                                404 -> "❌ Webhook niet gevonden"
-                                500, 502, 503, 504 -> "❌ Server fout (${response.code})"
-                                else -> "❌ Fout: HTTP ${response.code}"
-                            }
-                        } else {
-                            val result = gson.fromJson(responseBody, Map::class.java)
-                            result["reply"]?.toString() 
-                                ?: result["message"]?.toString() 
-                                ?: "Geen antwoord"
-                        }
-                    } ?: "Leeg antwoord"
-                } catch (e: Exception) {
-                    Log.e(TAG, "Parse error", e)
-                    "Fout bij verwerken antwoord"
-                }
-                
-                handleResponse(responseText)
-            }
-        })
-    }
-    
-    private fun handleResponse(responseText: String) {
-        mainHandler.post {
-            if (isDestroyed.get()) {
-                Log.w(TAG, "Screen destroyed, ignoring response")
-                return@post
-            }
-            
-            currentResponse = responseText
-            isLoading.set(false)
-            
-            if (ttsEnabled && ttsReady && tts != null) {
-                try {
-                    tts?.speak(currentResponse, TextToSpeech.QUEUE_FLUSH, null, "response")
-                } catch (e: Exception) {
-                    Log.e(TAG, "TTS error", e)
-                }
-            }
-            
-            safeInvalidate()
-            safeNavigate { ResponseScreen(carContext, currentResponse) }
-        }
-    }
-    
-    private fun safeInvalidate() {
-        if (isDestroyed.get()) return
-        
-        mainHandler.post {
-            try {
-                if (!isDestroyed.get()) {
-                    invalidate()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Invalidate failed", e)
-            }
-        }
-    }
 }
 
 /**
  * Quick Actions Screen - Chat-like interface for voice commands
- * 
- * Features:
- * - Voice input button at top for giving commands
- * - List of available quick actions with descriptions
- * - Command history showing recent exchanges
- * - Conversational feel with TTS responses
+ * Uses WebSocket for real-time responses
  */
 class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpeech.OnInitListener {
     
     private val TAG = "QuickActionsScreen"
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
-    private val gson = Gson()
+    // Use shared WebSocket client for real-time responses
+    private val agentClient = AutoAgentClient.getInstance(carContext)
     
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     
     private val preferencesManager = PreferencesManager(carContext)
-    private val gatewayUrl: String
-        get() = runBlocking { preferencesManager.getGatewayUrlSync() }
-    private val gatewayToken: String
-        get() = runBlocking { preferencesManager.getGatewayTokenSync() }
     private val ttsEnabled: Boolean
         get() = runBlocking { preferencesManager.getTtsEnabledSync() }
     
@@ -356,12 +227,12 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
     private var pendingActionId: String? = null
     
     @Volatile
-    private var connectionStatus = "Klaar om te helpen"
+    private var connectionStatus = "Verbinden..."
     
     private val isLoading = AtomicBoolean(false)
     private val isDestroyed = AtomicBoolean(false)
-    private val showingActions = AtomicBoolean(true) // Toggle between actions list and history
     
+    private val sessionKey = "agent:main:mymate:quickactions:auto"
     private val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale("nl", "NL"))
     
     init {
@@ -376,6 +247,18 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
                 cleanup()
             }
         })
+        
+        // Monitor connection state
+        scope.launch {
+            agentClient.connectionState.collect { state ->
+                mainHandler.post {
+                    connectionStatus = agentClient.getStatusText()
+                    if (!isDestroyed.get()) {
+                        safeInvalidate()
+                    }
+                }
+            }
+        }
     }
     
     override fun onInit(status: Int) {
@@ -494,7 +377,7 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
                             .setTitle("🗑️ Wis")
                             .setOnClickListener {
                                 commandHistory.clear()
-                                connectionStatus = "Geschiedenis gewist"
+                                connectionStatus = agentClient.getStatusText()
                                 safeInvalidate()
                             }
                             .build()
@@ -574,78 +457,32 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
         connectionStatus = "Versturen..."
         safeInvalidate()
         
-        // Build request body
-        val requestBody = mapOf(
-            "message" to command,
-            "action" to (actionId ?: "quick_action"),
-            "source" to "android_auto_quick_actions"
-        )
+        Log.d(TAG, "Sending command via WebSocket: $command")
         
-        val json = gson.toJson(requestBody)
-        val body = json.toRequestBody("application/json".toMediaType())
-        
-        // Build HTTP URL from gateway URL
-        val httpUrl = try {
-            val uri = java.net.URI(gatewayUrl)
-            val scheme = when (uri.scheme) {
-                "ws" -> "http"
-                "wss" -> "https"
-                else -> uri.scheme
-            }
-            val port = if (uri.port > 0) uri.port else 18789
-            "$scheme://${uri.host}:$port/hooks/agent"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing gateway URL", e)
-            gatewayUrl
-        }
-        
-        val request = Request.Builder()
-            .url(httpUrl)
-            .post(body)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer $gatewayToken")
-            .build()
-        
-        Log.d(TAG, "Sending command: $command")
-        
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Request failed", e)
-                handleResponse("❌ Verbindingsfout: ${e.localizedMessage ?: "Onbekende fout"}")
-            }
+        // Send via WebSocket for real-time response
+        scope.launch {
+            val result = agentClient.sendMessage(command, sessionKey)
             
-            override fun onResponse(call: Call, response: Response) {
-                Log.d(TAG, "Got response: ${response.code}")
-                
-                if (!response.isSuccessful) {
-                    val errorMsg = when (response.code) {
-                        401 -> "❌ Token onjuist - controleer instellingen"
-                        403 -> "❌ Geen toegang"
-                        404 -> "❌ Server niet gevonden"
-                        500, 502, 503, 504 -> "❌ Server fout - probeer later"
-                        else -> "❌ Fout: HTTP ${response.code}"
+            result.fold(
+                onSuccess = { reply ->
+                    handleResponse(reply)
+                },
+                onFailure = { error ->
+                    Log.e(TAG, "Request failed", error)
+                    val errorMsg = when {
+                        error.message?.contains("timeout", ignoreCase = true) == true ->
+                            "❌ Timeout - geen antwoord ontvangen"
+                        error.message?.contains("token", ignoreCase = true) == true ->
+                            "❌ Token onjuist - controleer instellingen"
+                        error.message?.contains("verbonden", ignoreCase = true) == true ->
+                            "❌ ${error.message}"
+                        else ->
+                            "❌ Fout: ${error.localizedMessage ?: "Onbekende fout"}"
                     }
                     handleResponse(errorMsg)
-                    return
                 }
-                
-                val responseText = try {
-                    response.body?.use { body ->
-                        val responseBody = body.string()
-                        val result = gson.fromJson(responseBody, Map::class.java)
-                        result["reply"]?.toString() 
-                            ?: result["message"]?.toString()
-                            ?: result["text"]?.toString()
-                            ?: "Geen antwoord"
-                    } ?: "Leeg antwoord"
-                } catch (e: Exception) {
-                    Log.e(TAG, "Parse error", e)
-                    "Fout bij verwerken antwoord"
-                }
-                
-                handleResponse(responseText)
-            }
-        })
+            )
+        }
     }
     
     private fun handleResponse(responseText: String) {
@@ -669,7 +506,7 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
             pendingCommand = null
             pendingActionId = null
             isLoading.set(false)
-            connectionStatus = "Klaar om te helpen"
+            connectionStatus = agentClient.getStatusText()
             
             // Speak response if TTS enabled
             if (ttsEnabled && ttsReady && tts != null) {
@@ -700,6 +537,7 @@ class QuickActionsScreen(carContext: CarContext) : Screen(carContext), TextToSpe
     
     private fun cleanup() {
         isDestroyed.set(true)
+        scope.cancel()
         try {
             tts?.stop()
             tts?.shutdown()
