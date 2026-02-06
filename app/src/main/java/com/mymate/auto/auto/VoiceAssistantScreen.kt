@@ -96,10 +96,44 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         
+        // Quick action buttons in overflow menu (⋮)
+        val actionStrip = ActionStrip.Builder()
+            .addAction(
+                Action.Builder()
+                    .setTitle("📅 Agenda")
+                    .setOnClickListener { sendQuickMessage("Wat staat er vandaag op mijn agenda?") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("🌤️ Weer")
+                    .setOnClickListener { sendQuickMessage("Hoe is het weer vandaag?") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("📍 Parking")
+                    .setOnClickListener { sendQuickMessage("Waar heb ik mijn auto geparkeerd?") }
+                    .build()
+            )
+            .addAction(
+                Action.Builder()
+                    .setTitle("⏰ Tijd")
+                    .setOnClickListener { sendQuickMessage("Hoe laat is het nu?") }
+                    .build()
+            )
+            .build()
+        
         return PaneTemplate.Builder(paneBuilder.build())
             .setTitle("🎤 MyMate")
             .setHeaderAction(Action.BACK)
+            .setActionStrip(actionStrip)
             .build()
+    }
+    
+    private fun sendQuickMessage(message: String) {
+        if (isProcessing) return
+        handleUserMessage(message)
     }
     
     private fun startVoiceInput() {
