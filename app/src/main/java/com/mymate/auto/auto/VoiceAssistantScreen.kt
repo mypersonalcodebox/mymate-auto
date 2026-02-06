@@ -120,27 +120,10 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     
     /**
      * Open quick actions submenu
+     * QuickActionsAutoScreen is self-contained - handles its own message sending
      */
     private fun openQuickActionsMenu() {
-        screenManager.push(
-            QuickActionsAutoScreen(carContext) { prefix, context ->
-                startTemplatedVoice(prefix, context)
-            }
-        )
-    }
-    
-    /**
-     * Open voice input with a prompt template
-     * User speaks to complete the template
-     */
-    private fun startTemplatedVoice(promptPrefix: String, context: String) {
-        screenManager.push(
-            VoiceInputScreen(carContext, context) { userInput ->
-                // Combine template + user input
-                val fullMessage = "$promptPrefix $userInput"
-                handleUserMessage(fullMessage)
-            }
-        )
+        screenManager.push(QuickActionsAutoScreen(carContext))
     }
     
     private fun startVoiceInput() {
