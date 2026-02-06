@@ -122,25 +122,16 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     /**
-     * Send message via WebSocket and show response on VoiceAssistantScreen
+     * Send message via WebSocket - uses popToRoot + TTS only (safest approach)
      * 
-     * Pops back to VoiceAssistantScreen and uses shared state to pass response
+     * Android Auto's template step limit makes screen manipulation risky.
+     * Just go back to root and use voice feedback.
      */
     private fun sendMessageAndShowResponse(message: String) {
         Log.d(TAG, "Sending: ${message.take(50)}...")
         
-        // Set pending response to show we're processing
-        VoiceAssistantScreen.pendingResponse = "⏳ Even geduld..."
-        
-        // Pop back to VoiceAssistantScreen (removes QuickActions and VoiceInput if present)
-        // We pop twice: once for VoiceInput (if open), once for QuickActions
-        try {
-            screenManager.pop() // Pop VoiceInput or QuickActions
-            screenManager.pop() // Pop QuickActions (if VoiceInput was open)
-        } catch (e: Exception) {
-            // If we can't pop twice, just pop once
-            Log.d(TAG, "Single pop only: ${e.message}")
-        }
+        // Go back to root immediately - safest approach
+        screenManager.popToRoot()
         
         // Speak that we're processing
         ttsManager.speak("Even geduld...")
@@ -153,10 +144,7 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                     Log.d(TAG, "Got response: ${response.take(50)}...")
                     
                     mainHandler.post {
-                        // Update shared state - VoiceAssistantScreen will pick this up
-                        VoiceAssistantScreen.pendingResponse = response
-                        
-                        // Speak the response
+                        // Just speak - user is at main menu
                         ttsManager.speak(response)
                     }
                 }
@@ -165,7 +153,6 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                     Log.e(TAG, "Request failed: ${error.message}")
                     
                     mainHandler.post {
-                        VoiceAssistantScreen.pendingResponse = "❌ ${error.message ?: "Er ging iets mis"}"
                         ttsManager.speak("Sorry, er ging iets mis")
                     }
                 }
@@ -173,7 +160,6 @@ class QuickActionsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 Log.e(TAG, "Exception: ${e.message}", e)
                 
                 mainHandler.post {
-                    VoiceAssistantScreen.pendingResponse = "❌ ${e.message ?: "Onbekende fout"}"
                     ttsManager.speak("Sorry, er ging iets mis")
                 }
             }
