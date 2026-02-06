@@ -1,15 +1,16 @@
 package com.mymate.auto.auto
 
-import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.*
 import com.mymate.auto.data.local.PreferencesManager
 import kotlinx.coroutines.runBlocking
 
+/**
+ * Simple settings screen for Android Auto
+ */
 class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
     
-    private val TAG = "SettingsAutoScreen"
     private val preferencesManager = PreferencesManager(carContext)
     
     private var ttsEnabled: Boolean
@@ -19,9 +20,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val listBuilder = ItemList.Builder()
         
-        // Android Auto max 6 items!
-        
-        // 1. TTS Toggle (essential for driving)
+        // 1. TTS Toggle
         listBuilder.addItem(
             Row.Builder()
                 .setTitle("🔊 Tekst-naar-spraak")
@@ -33,63 +32,24 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
         
-        // 2. Connection Test (troubleshooting)
+        // 2. Gateway Info
+        val gatewayUrl = runBlocking { preferencesManager.getGatewayUrlSync() }
+        val maskedUrl = gatewayUrl.replace(Regex("\\d+\\.\\d+\\.\\d+"), "***")
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("🧪 Test verbinding")
-                .addText("TCP + WebSocket auth test")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(ConnectionTestAutoScreen(carContext))
-                }
+                .setTitle("🌐 Gateway")
+                .addText(maskedUrl)
                 .build()
         )
         
-        // 3. Agenda & Briefing (extra feature)
+        // 3. App Version
+        val versionName = try {
+            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName
+        } catch (e: Exception) { "?" }
         listBuilder.addItem(
             Row.Builder()
-                .setTitle("📅 Agenda & Briefing")
-                .addText("Afspraken en dagelijks overzicht")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(AgendaBriefingMenuScreen(carContext))
-                }
-                .build()
-        )
-        
-        // 4. Voice Assistant (main feature)
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🎤 Voice Assistant")
-                .addText("Praat met MyMate")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(VoiceAssistantScreen(carContext))
-                }
-                .build()
-        )
-        
-        // 5. Developer Tools
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🛠️ Developer")
-                .addText("Taken en projecten")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(DeveloperActionsScreen(carContext))
-                }
-                .build()
-        )
-        
-        // 6. App Info (version, gateway config)
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📱 Over MyMate")
-                .addText("Versie en configuratie")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(AppInfoScreen(carContext))
-                }
+                .setTitle("📱 Versie")
+                .addText("MyMate v$versionName")
                 .build()
         )
         
@@ -100,99 +60,3 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 }
-
-/**
- * Submenu for Agenda and Morning Briefing
- */
-class AgendaBriefingMenuScreen(carContext: CarContext) : Screen(carContext) {
-    
-    override fun onGetTemplate(): Template {
-        val listBuilder = ItemList.Builder()
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📅 Agenda")
-                .addText("Vandaag en morgen")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(AgendaAutoScreen(carContext))
-                }
-                .build()
-        )
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🌅 Ochtend Briefing")
-                .addText("Weer, agenda, overzicht")
-                .setBrowsable(true)
-                .setOnClickListener {
-                    screenManager.push(MorningBriefingScreen(carContext))
-                }
-                .build()
-        )
-        
-        return ListTemplate.Builder()
-            .setTitle("📅 Agenda & Briefing")
-            .setHeaderAction(Action.BACK)
-            .setSingleList(listBuilder.build())
-            .build()
-    }
-}
-
-/**
- * App info screen with version and gateway configuration
- */
-class AppInfoScreen(carContext: CarContext) : Screen(carContext) {
-    
-    private val preferencesManager = PreferencesManager(carContext)
-    
-    override fun onGetTemplate(): Template {
-        val version = try {
-            carContext.packageManager.getPackageInfo(carContext.packageName, 0).versionName ?: "?"
-        } catch (e: Exception) {
-            "?"
-        }
-        
-        val gatewayUrl = runBlocking { preferencesManager.getGatewayUrlSync() }
-        val webhookUrl = runBlocking { preferencesManager.getWebhookUrlSync() }
-        val hasToken = runBlocking { preferencesManager.getGatewayTokenSync().isNotEmpty() }
-        
-        val listBuilder = ItemList.Builder()
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("📱 Versie")
-                .addText(version)
-                .build()
-        )
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🌐 Gateway")
-                .addText(gatewayUrl.take(45))
-                .build()
-        )
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("🔑 Token")
-                .addText(if (hasToken) "Ingesteld ✅" else "Niet ingesteld ❌")
-                .build()
-        )
-        
-        listBuilder.addItem(
-            Row.Builder()
-                .setTitle("ℹ️ Configuratie wijzigen")
-                .addText("Gebruik de telefoon app")
-                .build()
-        )
-        
-        return ListTemplate.Builder()
-            .setTitle("📱 Over MyMate")
-            .setHeaderAction(Action.BACK)
-            .setSingleList(listBuilder.build())
-            .build()
-    }
-}
-
-// ConnectionTestScreen moved to ConnectionTestAutoScreen.kt with full TCP + WebSocket auth testing
