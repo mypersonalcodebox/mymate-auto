@@ -1,9 +1,13 @@
 package com.mymate.auto
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,9 +34,19 @@ import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
     
+    private val requestCalendarPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Permission result handled - calendar will work if granted */ }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Request calendar permission if not granted
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) 
+            != PackageManager.PERMISSION_GRANTED) {
+            requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
+        }
         
         val preferencesManager = PreferencesManager(this)
         
