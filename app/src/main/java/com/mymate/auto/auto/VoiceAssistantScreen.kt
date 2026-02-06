@@ -97,6 +97,7 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
         }
         
         // Quick action buttons - PaneTemplate allows max 2 actions!
+        // Use one for direct action, one for submenu with more options
         val actionStrip = ActionStrip.Builder()
             .addAction(
                 Action.Builder()
@@ -106,8 +107,8 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addAction(
                 Action.Builder()
-                    .setTitle("🌤️ Weer")
-                    .setOnClickListener { sendQuickMessage("Hoe is het weer vandaag?") }
+                    .setTitle("⚡ Meer")
+                    .setOnClickListener { openQuickActionsMenu() }
                     .build()
             )
             .build()
@@ -122,6 +123,17 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     private fun sendQuickMessage(message: String) {
         if (isProcessing) return
         handleUserMessage(message)
+    }
+    
+    /**
+     * Open quick actions submenu
+     */
+    private fun openQuickActionsMenu() {
+        screenManager.push(
+            QuickActionsAutoScreen(carContext) { prefix, context ->
+                startTemplatedVoice(prefix, context)
+            }
+        )
     }
     
     /**
