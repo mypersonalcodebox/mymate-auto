@@ -137,9 +137,7 @@ class SettingsAutoScreen(carContext: CarContext) : Screen(carContext) {
         if (agentClient.isConnected()) {
             ttsManager.speak("Verbinding is actief")
         } else {
-            // Try to reconnect
-            agentClient.connect()
-            ttsManager.speak("Opnieuw verbinden...")
+            ttsManager.speak("Niet verbonden. Open de app om te verbinden.")
         }
         
         invalidate()
