@@ -22,6 +22,10 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     companion object {
         private const val TAG = "VoiceAssistantScreen"
         private const val MAX_RESPONSE_LENGTH = 100
+        
+        // Shared state for QuickActionsAutoScreen to communicate responses back
+        @Volatile
+        var pendingResponse: String? = null
     }
     
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -52,6 +56,13 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     override fun onGetTemplate(): Template {
+        // Check for pending response from QuickActionsAutoScreen
+        pendingResponse?.let { response ->
+            lastResponse = response
+            pendingResponse = null
+            // TTS is already handled by QuickActionsAutoScreen
+        }
+        
         val paneBuilder = Pane.Builder()
         
         // Show current status/last response
@@ -137,13 +148,16 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
     }
     
     /**
-     * Handle user message - uses popToRoot + TTS only to avoid template step limit
+     * Handle user message - updates this screen with response
+     * VoiceInputScreen already pops itself, so we just update state here
      */
     private fun handleUserMessage(message: String) {
         Log.d(TAG, "User said: ${message.take(50)}...")
         
-        // Pop back to root immediately to avoid screen stack issues
-        screenManager.popToRoot()
+        // Update UI to show processing state
+        isProcessing = true
+        lastResponse = "🎤 \"${message.take(50)}${if (message.length > 50) "..." else ""}\""
+        invalidate()
         
         // Speak that we're processing
         ttsManager.speak("Even geduld...")
@@ -156,7 +170,12 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                     Log.d(TAG, "Got response: ${response.take(50)}...")
                     
                     mainHandler.post {
-                        // Just speak the response - no screen updates needed
+                        // Update screen with response
+                        lastResponse = response
+                        isProcessing = false
+                        invalidate()
+                        
+                        // Speak the response
                         ttsManager.speak(response)
                     }
                 }
@@ -165,14 +184,20 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                     Log.e(TAG, "Request failed: ${error.message}")
                     
                     mainHandler.post {
-                        ttsManager.speak("Sorry, er ging iets mis: ${error.message ?: "onbekende fout"}")
+                        lastResponse = "❌ ${error.message ?: "Er ging iets mis"}"
+                        isProcessing = false
+                        invalidate()
+                        
+                        ttsManager.speak("Sorry, er ging iets mis")
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Exception: ${e.message}", e)
                 
                 mainHandler.post {
-                    ttsManager.speak("Sorry, er ging iets mis")
+                    lastResponse = "❌ ${e.message ?: "Onbekende fout"}"
+                    isProcessing = false
+                    invalidate()
                 }
             }
         }
