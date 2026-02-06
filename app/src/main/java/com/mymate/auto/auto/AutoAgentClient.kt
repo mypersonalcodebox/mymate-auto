@@ -125,7 +125,7 @@ class AutoAgentClient private constructor(private val context: Context) {
      */
     suspend fun sendMessage(
         message: String,
-        sessionKey: String = "agent:main:mymate:auto",
+        sessionKey: String = "agent:main:mymate",  // Same as phone app for shared conversation
         timeoutMs: Long = 120_000
     ): Result<String> {
         // Ensure connected
