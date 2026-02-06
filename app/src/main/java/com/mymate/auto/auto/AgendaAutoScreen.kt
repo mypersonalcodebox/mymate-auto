@@ -124,10 +124,15 @@ class AgendaAutoScreen(carContext: CarContext) : Screen(carContext) {
     private fun buildEventRow(event: CalendarHelper.CalendarEvent, prefix: String?): Row {
         val timeText = if (prefix != null) "$prefix ${event.getTimeRange()}" else event.getTimeRange()
         val locationIcon = if (event.hasLocation()) " 📍" else ""
+        // Show calendar name if it's not the primary account
+        val calendarSuffix = event.calendarName?.let { name ->
+            if (name.contains("@") || name.lowercase() == "calendar") "" 
+            else " • $name"
+        } ?: ""
         
         return Row.Builder()
             .setTitle("$timeText$locationIcon")
-            .addText(event.title)
+            .addText("${event.title}$calendarSuffix")
             .apply {
                 if (event.hasLocation()) {
                     setOnClickListener { navigateToEvent(event) }

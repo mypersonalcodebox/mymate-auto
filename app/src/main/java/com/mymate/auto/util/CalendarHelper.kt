@@ -25,7 +25,8 @@ object CalendarHelper {
         val location: String?,
         val startTime: Long,
         val endTime: Long,
-        val allDay: Boolean
+        val allDay: Boolean,
+        val calendarName: String? = null
     ) {
         fun getFormattedTime(): String {
             val format = if (allDay) {
@@ -120,7 +121,8 @@ object CalendarHelper {
             CalendarContract.Events.EVENT_LOCATION,
             CalendarContract.Events.DTSTART,
             CalendarContract.Events.DTEND,
-            CalendarContract.Events.ALL_DAY
+            CalendarContract.Events.ALL_DAY,
+            CalendarContract.Events.CALENDAR_DISPLAY_NAME
         )
         
         val selection = "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?"
@@ -146,8 +148,9 @@ object CalendarHelper {
                     val start = it.getLong(4)
                     val end = it.getLong(5)
                     val allDay = it.getInt(6) == 1
+                    val calendarName = it.getString(7)
                     
-                    events.add(CalendarEvent(id, title, description, location, start, end, allDay))
+                    events.add(CalendarEvent(id, title, description, location, start, end, allDay, calendarName))
                 }
             }
         } catch (e: Exception) {
