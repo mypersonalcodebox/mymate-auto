@@ -94,7 +94,15 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
      */
     fun speak(text: String, stripMarkdown: Boolean = true) {
         if (!initialized) {
-            Log.w(TAG, "TTS not initialized yet")
+            Log.w(TAG, "TTS not initialized yet, retrying in 500ms")
+            // Retry after short delay - TTS may still be initializing
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (initialized) {
+                    speak(text, stripMarkdown)
+                } else {
+                    Log.e(TAG, "TTS still not initialized after retry")
+                }
+            }, 500)
             return
         }
         

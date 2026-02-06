@@ -132,7 +132,9 @@ class VoiceAssistantScreen(carContext: CarContext) : Screen(carContext) {
                         invalidate()
                         
                         // Speak the response
+                        Log.d(TAG, "About to speak response: ${response.take(50)}...")
                         ttsManager.speak(response)
+                        Log.d(TAG, "TTS speak() called")
                     }
                 }
                 
